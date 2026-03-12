@@ -1,10 +1,8 @@
-import Anthropic from '@anthropic-ai/sdk';
+import { LLMProvider } from './llm_provider.js';
 import dotenv from 'dotenv';
 dotenv.config();
 
-const anthropic = new Anthropic({
-    apiKey: process.env.ANTHROPIC_API_KEY,
-});
+const llm = new LLMProvider();
 
 /**
  * Analyzes Swiggy Instamart JSON order history to determine grocery consumption patterns.
@@ -47,21 +45,12 @@ Always output raw JSON. Do not include markdown formatting like \`\`\`json.
 `;
 
     try {
-        const response = await anthropic.messages.create({
-            model: "claude-3-5-sonnet-20241022",
-            max_tokens: 1500,
-            system: systemPrompt,
-            messages: [
-                {
-                    role: "user",
-                    content: `Here is my detailed order history. The current date is ${new Date().toISOString()}:\n\n ${JSON.stringify(detailedOrders)}`
-                }
-            ],
-            temperature: 0.1, // Low temperature for deterministic/analytical output
-        });
+        const userPrompt = `Here is my detailed order history. The current date is ${new Date().toISOString()}:\n\n ${JSON.stringify(detailedOrders)}`;
 
-        const jsonString = response.content[0].text.trim();
-        // Remove markdown formatting if Claude disobeys the prompt slightly
+        const responseText = await llm.generateText(systemPrompt, userPrompt, 0.1);
+
+        const jsonString = responseText.trim();
+        // Remove markdown formatting if the LLM disobeys the prompt slightly
         const cleanJson = jsonString.replace(/^```json\s*/, '').replace(/\s*```$/, '');
 
         const schedule = JSON.parse(cleanJson);

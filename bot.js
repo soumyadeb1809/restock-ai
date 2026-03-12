@@ -1,10 +1,25 @@
 import { Telegraf } from 'telegraf';
 import dotenv from 'dotenv';
+import crypto from 'crypto';
 import { saveAuthToken, getAuthToken, saveConsumptionSchedule, getConsumptionSchedule } from './db.js';
 import { SwiggyClient } from './mcp_client.js';
 import { analyzeOrderHistory } from './pattern_engine.js';
+import { handleUserQuery } from './agent_brain.js';
 
 dotenv.config();
+
+// PKCE helpers
+function generateCodeVerifier() {
+    return crypto.randomBytes(32).toString('base64url');
+}
+
+function generateCodeChallenge(verifier) {
+    return crypto.createHash('sha256').update(verifier).digest('base64url');
+}
+
+// Temporary in-memory store for the PKCE code_verifier (single-user MVP)
+// This is cleared after successful login
+let pendingCodeVerifier = null;
 
 const bot = new Telegraf(process.env.TELEGRAM_BOT_TOKEN);
 const ALLOWED_USER_ID = parseInt(process.env.TELEGRAM_ALLOWED_USER_ID, 10);
@@ -29,10 +44,24 @@ bot.command('start', (ctx) => {
 });
 
 // Command: /login
-bot.command('login', (ctx) => {
-    // We construct the Swiggy OAuth URL. 
-    // Usually, this is documented, but we redirect to the whitelisted localhost.
-    const oauthUrl = `https://mcp.swiggy.com/oauth/authorize?client_id=mcp_client&redirect_uri=http://localhost/callback&response_type=code`;
+bot.command('login', async (ctx) => {
+    // Generate PKCE code_verifier and code_challenge (required by Swiggy's OAuth)
+    const codeVerifier = generateCodeVerifier();
+    const codeChallenge = generateCodeChallenge(codeVerifier);
+
+    // Store verifier in memory so we can use it when the user pastes the callback URL
+    pendingCodeVerifier = codeVerifier;
+
+    // Correct Swiggy OAuth endpoint (discovered via .well-known/oauth-authorization-server)
+    const params = new URLSearchParams({
+        response_type: 'code',
+        client_id: 'restock-bot',
+        redirect_uri: 'http://localhost/callback',
+        code_challenge: codeChallenge,
+        code_challenge_method: 'S256',
+        scope: 'mcp:tools'
+    });
+    const oauthUrl = `https://mcp.swiggy.com/auth/authorize?${params.toString()}`;
 
     ctx.reply(
         "🔐 **Authentication Time**\n\n" +
@@ -67,11 +96,18 @@ bot.command('analyze', async (ctx) => {
 
     try {
         // Fetch history
-        const historyResponse = await swiggy.getOrderHistory();
+        const historyResponse = await swiggy.getOrders(50);
 
         // Extract basic orders or default to empty array
-        const rawHistory = historyResponse.content ? historyResponse.content : (historyResponse || []);
-        const orderList = Array.isArray(rawHistory) ? rawHistory : (rawHistory.orders || []);
+        const textContent = historyResponse.content?.[0]?.text;
+        let orderList = [];
+        try {
+            const parsed = textContent ? JSON.parse(textContent) : {};
+            orderList = parsed.data?.orders || [];
+        } catch (e) {
+            console.warn("Failed to parse orders JSON:", e);
+            orderList = [];
+        }
 
         ctx.reply(`✅ Found ${orderList.length} total past orders. Fetching full details for the 20 most recent orders...`);
 
@@ -117,37 +153,89 @@ bot.command('analyze', async (ctx) => {
     }
 });
 
-// Handle incoming URLs (The token capture flow)
+// Handle incoming URLs (The token capture flow) and general natural language queries
 bot.on('text', async (ctx) => {
     const text = ctx.message.text.trim();
 
-    // Check if the user pasted the localhost callback URL
-    if (text.startsWith('http://localhost/callback?code=')) {
+    // 1. Check if the user pasted the localhost callback URL
+    if (text.startsWith('http://localhost/callback')) {
         try {
             const url = new URL(text);
             const code = url.searchParams.get('code');
 
-            if (code) {
-                // In a true OAuth flow, we exchange 'code' for an 'access_token'.
-                // If Swiggy returns the long-lived token directly in the query as the 'code' parameter 
-                // (some simple MCPs do this), we use it directly. Assuming it needs a direct exchange:
+            if (!code) {
+                return ctx.reply("⚠️ I didn't find a code in that URL. Please try /login again.");
+            }
 
-                // For MVP: We will assume the 'code' is the token we pass to the Bearer header
-                // or we implement the token exchange if Swiggy strictly requires a POST to `/oauth/token`.
+            if (!pendingCodeVerifier) {
+                return ctx.reply("⚠️ Session expired. Please type /login to start fresh.");
+            }
 
-                // Save it to Firebase
-                const success = await saveAuthToken(ctx.from.id, code);
+            ctx.reply("🔄 Exchanging code for access token...");
 
-                if (success) {
-                    ctx.reply("✅ Successfully captured your Swiggy authentication token! You're ready to go. Type /analyze to build your grocery profile.");
-                } else {
-                    ctx.reply("❌ Failed to save the token to the database. Check server logs.");
-                }
+            // Exchange auth code for access token using Swiggy's token endpoint
+            const tokenResponse = await fetch('https://mcp.swiggy.com/auth/token', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: new URLSearchParams({
+                    grant_type: 'authorization_code',
+                    code,
+                    redirect_uri: 'http://localhost/callback',
+                    client_id: 'restock-bot',
+                    code_verifier: pendingCodeVerifier,
+                }).toString()
+            });
+
+            const tokenData = await tokenResponse.json();
+
+            if (!tokenResponse.ok || !tokenData.access_token) {
+                console.error("Token exchange failed:", tokenData);
+                return ctx.reply(`❌ Swiggy rejected the token exchange: ${tokenData.error_description || tokenData.error || 'Unknown error'}. Please try /login again.`);
+            }
+
+            // Clear the pending verifier
+            pendingCodeVerifier = null;
+
+            // Save the full token object (includes access_token + refresh_token if present)
+            const success = await saveAuthToken(ctx.from.id, tokenData);
+
+            if (success) {
+                ctx.reply("✅ Successfully authenticated with Swiggy! You're ready to go.\n\nType /analyze to build your grocery profile or just ask me a question!");
             } else {
-                ctx.reply("⚠️ I didn't find a code in that URL. Please try logging in again.");
+                ctx.reply("❌ Failed to save the token to the database. Check server logs.");
             }
         } catch (e) {
-            ctx.reply("⚠️ That doesn't look like a valid URL. Please paste the exact URL from your browser after logging in.");
+            console.error("Token capture error:", e);
+            ctx.reply("⚠️ Something went wrong. Please paste the exact URL from your browser after logging in, or try /login again.");
+        }
+    }
+    // 2. Otherwise, treat as a general conversational query
+    else {
+        try {
+            const token = await getAuthToken(ctx.from.id);
+            if (!token) {
+                return ctx.reply("💬 I'd love to help, but you need to /login first so I can access Swiggy for you!");
+            }
+
+            const swiggy = new SwiggyClient();
+            const connected = await swiggy.connect(token);
+
+            if (!connected) {
+                return ctx.reply("❌ I couldn't connect to Swiggy. Your token might be expired. Please /login again.");
+            }
+
+            try {
+                // Let the user know we are working on it
+                ctx.reply("🤔 Let me check that for you...");
+
+                const response = await handleUserQuery(swiggy, text);
+                ctx.reply(response, { parse_mode: 'Markdown' });
+            } finally {
+                await swiggy.disconnect();
+            }
+        } catch (e) {
+            console.error("General Query Error:", e);
+            ctx.reply("❌ I encountered an error while searching Swiggy. Please try again later.");
         }
     }
 });

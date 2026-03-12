@@ -1,5 +1,5 @@
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
-import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
+import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 
 export class SwiggyClient {
     constructor() {
@@ -7,20 +7,26 @@ export class SwiggyClient {
         this.transport = null;
     }
 
-    async connect(authToken) {
-        if (!authToken) {
+    async connect(tokenData) {
+        if (!tokenData) {
             throw new Error("No Swiggy auth token provided");
         }
 
-        const url = new URL('https://mcp.swiggy.com/im/sse');
+        // tokenData can be a full object {access_token, refresh_token, ...} or a plain string
+        const accessToken = typeof tokenData === 'string'
+            ? tokenData
+            : tokenData.access_token;
 
-        // Setup SSE Transport with Auth Headers
-        // The Swiggy MCP uses cookies or bearer tokens derived from OAuth. 
-        // Based on typical MCP HTTP setups, we pass the token in headers.
-        this.transport = new SSEClientTransport(url, {
+        if (!accessToken) {
+            throw new Error("Invalid token: access_token is missing");
+        }
+
+        const url = new URL('https://mcp.swiggy.com/im');
+
+        this.transport = new StreamableHTTPClientTransport(url, {
             requestInit: {
                 headers: {
-                    'Authorization': `Bearer ${authToken}`
+                    'Authorization': `Bearer ${accessToken}`
                 }
             }
         });
@@ -68,21 +74,20 @@ export class SwiggyClient {
 
     // --- Specific Domain Wrappers ---
 
-    async getOrderHistory() {
-        // tool from Swiggy's internal manifest
-        return this.callTool('get_order_history', {});
+    async getOrders(count = 10) {
+        return this.callTool('get_orders', { count, orderType: "INSTAMART" });
     }
 
-    async getOrderDetails(order_id) {
-        return this.callTool('get_order_details', { order_id });
+    async getOrderDetails(orderId) {
+        return this.callTool('get_order_details', { orderId });
     }
 
     async searchProducts(query) {
         return this.callTool('search_products', { query });
     }
 
-    async viewCart() {
-        return this.callTool('view_cart', {});
+    async getCart() {
+        return this.callTool('get_cart', {});
     }
 
     async updateCart(item_id, quantity) {
