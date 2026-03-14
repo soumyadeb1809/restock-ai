@@ -167,6 +167,7 @@ Since Swiggy's OAuth only allows `http://localhost/callback` as a redirect URI, 
 - ⚠️ Keep the Swiggy app **closed** while the bot is running to avoid session conflicts
 - 🔄 Swiggy auth tokens may expire — if the bot can't connect, just type `/login` again
 - 💳 Swiggy Instamart currently only supports **COD** for programmatic orders, so always review your cart before checking out
+- 🛒 **Cart Limitation**: Swiggy's API currently only accepts programmatic cart updates if your cart is **empty**. If the bot fails to add items, ensure your Instamart cart is completely empty in the Swiggy mobile app first.
 
 ---
 
