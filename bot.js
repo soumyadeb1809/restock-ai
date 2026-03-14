@@ -28,7 +28,7 @@ const ALLOWED_USER_ID = parseInt(process.env.TELEGRAM_ALLOWED_USER_ID, 10);
 bot.use(async (ctx, next) => {
     if (!ctx.from || ctx.from.id !== ALLOWED_USER_ID) {
         // Silently ignore or warn unauthorized users
-        console.warn(`Unauthorized access attempt from user ID: ${ctx.from?.id}`);
+        console.warn(`Unauthorized access attempt from user ID: ${ctx.from?.id} `);
         return;
     }
     return next();
@@ -95,52 +95,69 @@ bot.command('analyze', async (ctx) => {
     }
 
     try {
-        // Fetch history
-        const historyResponse = await swiggy.getOrders(50);
+        // Fetch history using the new deep scraper (target 20 orders)
+        const orderList = await swiggy.getDeepOrderHistory(20);
 
-        // Extract basic orders or default to empty array
-        const textContent = historyResponse.content?.[0]?.text;
-        let orderList = [];
-        try {
-            const parsed = textContent ? JSON.parse(textContent) : {};
-            orderList = parsed.data?.orders || [];
-        } catch (e) {
-            console.warn("Failed to parse orders JSON:", e);
-            orderList = [];
+        if (orderList.length === 0) {
+            ctx.reply("⚠️ No orders found in your history. I'll rely on your 'Go To Items' if available.");
+        } else {
+            ctx.reply(`✅ Found ${orderList.length} total past orders. Fetching full details for each...`);
         }
 
-        ctx.reply(`✅ Found ${orderList.length} total past orders. Fetching full details for the 20 most recent orders...`);
-
-        // Enforce limit of latest 20 orders to save LLM context window limits
-        const recentOrders = orderList.slice(0, 20);
         const detailedOrders = [];
 
-        // Fetch deep details for each order
-        for (const order of recentOrders) {
-            try {
-                // Swiggy order structures vary; assuming 'id' or 'order_id' exists
-                const orderId = order.id || order.order_id;
-                if (orderId) {
-                    const details = await swiggy.getOrderDetails(orderId);
-                    detailedOrders.push(details.content || details);
-                }
-            } catch (err) {
-                console.warn(`Failed to fetch details for an order: ${err.message}`);
+        // Process orderList directly (it already contains items!)
+        for (const order of orderList) {
+            const items = order.items || order.order_items || [];
+            if (items.length > 0) {
+                detailedOrders.push({
+                    orderId: order.orderId || order.id || order.order_id,
+                    createdAt: order.createdAt || order.order_time,
+                    items: items.map(i => ({ name: i.name || i.item_name, quantity: i.quantity || i.item_quantity }))
+                });
             }
         }
 
-        ctx.reply(`✅ Fetched full details for ${detailedOrders.length} orders. Now analyzing your consumption patterns and brand preferences using Claude...`);
+        console.log(`[Analyze] Successfully processed ${detailedOrders.length} orders from history.`);
 
-        // Analyze the detailed array
-        const schedule = await analyzeOrderHistory(detailedOrders);
+        // Save history to debug folder for visibility
+        fs.writeFileSync(`debug/latest_analyze_history.json`, JSON.stringify(orderList, null, 2));
+
+        ctx.reply(`✅ Fetched full details for ${detailedOrders.length} orders. Now analyzing your consumption patterns and brand preferences using Gemini...`);
+
+        // Fetch Go To Items as a fallback/additional signal
+        let gotoItems = [];
+        try {
+            const addressId = await getPreferredAddress(ctx.from.id);
+            if (addressId) {
+                const gotoResponse = await swiggy.getGoToItems(addressId);
+                const gotoText = gotoResponse.content?.[0]?.text;
+                const parsedGoto = gotoText ? JSON.parse(gotoText) : {};
+                gotoItems = parsedGoto.data?.items || [];
+                console.log(`[Analyze] Found ${gotoItems.length} Go To items.`);
+            }
+        } catch (gotoErr) {
+            console.warn("Failed to fetch Go To items:", gotoErr.message);
+        }
+
+        // Analyze the detailed array + goto items
+        const schedule = await analyzeOrderHistory(detailedOrders, gotoItems);
 
         if (schedule && schedule.schedule) {
             await saveConsumptionSchedule(ctx.from.id, schedule);
+            console.log(`[Analyze] Generated schedule with ${schedule.schedule.length} items.`);
+
             let replyText = "🧠 Analysis complete! Here are the recurring items I found:\n\n";
             for (const item of schedule.schedule) {
                 replyText += `- **${item.itemName}** (Every ${item.frequencyDays} days)\n  _Search Query:_ ${item.searchQuery}\n  _Next expected order:_ ${new Date(item.nextSuggestedOrderAt).toDateString()}\n\n`;
             }
-            ctx.reply(replyText, { parse_mode: 'Markdown' });
+
+            try {
+                await ctx.reply(replyText, { parse_mode: 'Markdown' });
+            } catch (markdownError) {
+                console.warn("[Analyze] Markdown parsing failed, falling back to plain text:", markdownError.message);
+                await ctx.reply(replyText);
+            }
         } else {
             ctx.reply("⚠️ Hmm, I couldn't find any clear recurring grocery patterns in your recent orders. I will try again next week.");
         }

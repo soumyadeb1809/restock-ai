@@ -7,6 +7,12 @@ dotenv.config();
 
 const provider = process.env.LLM_PROVIDER || 'gemini'; // default to gemini as it's free
 
+const GEMINI_MODEL = "gemini-2.5-flash";
+const CLAUDE_MODEL = "claude-3-5-sonnet-20241022";
+const OPENAI_MODEL = "gpt-4o-mini";
+
+console.log(`[LLMProvider] Global Config: Provider=${provider}, Model=${GEMINI_MODEL}`);
+
 /**
  * Generic LLM Provider to switch between vendors
  */
@@ -21,7 +27,7 @@ export class LLMProvider {
             });
         } else if (this.provider === 'gemini') {
             const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-            this.gemini = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+            this.gemini = genAI.getGenerativeModel({ model: GEMINI_MODEL });
         } else if (this.provider === 'openai') {
             this.openai = new OpenAI({
                 apiKey: process.env.OPENAI_API_KEY,
@@ -35,7 +41,7 @@ export class LLMProvider {
     async generateText(systemPrompt, userPrompt, temperature = 0.1) {
         if (this.provider === 'anthropic') {
             const response = await this.anthropic.messages.create({
-                model: "claude-3-5-sonnet-20241022",
+                model: CLAUDE_MODEL,
                 max_tokens: 2048,
                 system: systemPrompt,
                 messages: [{ role: "user", content: userPrompt }],
@@ -44,7 +50,7 @@ export class LLMProvider {
             return response.content[0].text;
         } else if (this.provider === 'openai') {
             const response = await this.openai.chat.completions.create({
-                model: "gpt-4o-mini",
+                model: OPENAI_MODEL,
                 messages: [
                     { role: "system", content: systemPrompt },
                     { role: "user", content: userPrompt }
@@ -82,7 +88,7 @@ export class LLMProvider {
         let currentMessages = [...messages];
 
         let response = await this.anthropic.messages.create({
-            model: "claude-3-5-sonnet-20241022",
+            model: CLAUDE_MODEL,
             max_tokens: 1536,
             system,
             messages: currentMessages,
@@ -103,7 +109,7 @@ export class LLMProvider {
             });
 
             response = await this.anthropic.messages.create({
-                model: "claude-3-5-sonnet-20241022",
+                model: CLAUDE_MODEL,
                 max_tokens: 1536,
                 system,
                 messages: currentMessages,
@@ -114,7 +120,7 @@ export class LLMProvider {
         return response.content[0].text;
     }
 
-    async _chatOpenAI(system, messages, tools, handlers, model = "gpt-4o-mini") {
+    async _chatOpenAI(system, messages, tools, handlers, model = OPENAI_MODEL) {
         let currentMessages = [
             { role: "system", content: system },
             ...messages.map(m => ({
@@ -177,7 +183,7 @@ export class LLMProvider {
         // Initialize model with tools and system instruction at the root level
         const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
         const model = genAI.getGenerativeModel({
-            model: "gemini-2.0-flash",
+            model: GEMINI_MODEL,
             systemInstruction: system,
             tools: [{
                 functionDeclarations: tools.map(t => ({

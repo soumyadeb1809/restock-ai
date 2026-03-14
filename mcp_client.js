@@ -1,6 +1,8 @@
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 
+const HISTORY_FETCH_LIMIT = 20; // Default target for deep history scraping
+
 export class SwiggyClient {
     constructor() {
         this.client = null;
@@ -74,8 +76,50 @@ export class SwiggyClient {
 
     // --- Specific Domain Wrappers ---
 
-    async getOrders(count = 10) {
-        return this.callTool('get_orders', { count, orderType: "INSTAMART" });
+    async getOrders(count = 20, fromTime = Date.now()) {
+        // The Swiggy MCP get_orders tool performs a backwards chronological search starting from fromTime.
+        // To get the absolute most recent orders, we MUST pass the current timestamp as fromTime.
+        // Defaulting to DASH as it correctly includes Instamart orders.
+        return this.callTool('get_orders', {
+            count,
+            orderType: "DASH",
+            businessLine: "INSTAMART",
+            fromTime
+        });
+    }
+
+    /**
+     * Fetches up to targetCount orders by paginating backwards in time.
+     */
+    async getDeepOrderHistory(targetCount = HISTORY_FETCH_LIMIT) {
+        let allOrders = [];
+        let currentFromTime = Date.now();
+        let hasMore = true;
+        let pagesFetched = 0;
+        const maxPages = 5; // Safety cap
+
+        console.log(`[SwiggyClient] Fetching deep history. Target: ${targetCount}`);
+
+        while (allOrders.length < targetCount && hasMore && pagesFetched < maxPages) {
+            const response = await this.getOrders(20, currentFromTime);
+            const text = response.content?.[0]?.text;
+            const data = text ? JSON.parse(text) : {};
+            const orders = data.data?.orders || [];
+            hasMore = data.data?.hasMore || false;
+
+            if (orders.length === 0) break;
+
+            allOrders = [...allOrders, ...orders];
+            pagesFetched++;
+
+            // Use the createdAt of the last order in this batch to search even further back
+            const lastOrder = orders[orders.length - 1];
+            currentFromTime = new Date(lastOrder.createdAt).getTime();
+
+            console.log(`[SwiggyClient] Page ${pagesFetched}: ${orders.length} orders found. Total: ${allOrders.length}. hasMore: ${hasMore}`);
+        }
+
+        return allOrders.slice(0, targetCount);
     }
 
     async getOrderDetails(orderId) {
@@ -99,5 +143,9 @@ export class SwiggyClient {
 
     async getAddresses() {
         return this.callTool('get_addresses', {});
+    }
+
+    async getGoToItems(addressId) {
+        return this.callTool('your_go_to_items', { addressId });
     }
 }

@@ -5,59 +5,88 @@ dotenv.config();
 const llm = new LLMProvider();
 
 /**
- * Analyzes Swiggy Instamart JSON order history to determine grocery consumption patterns.
+ * Analyzes Swiggy Instamart order data to determine grocery consumption patterns.
+ * Now supports both raw order history and "Your Go To Items".
  * 
  * @param {Array} detailedOrders - Raw JSON array of full order details
+ * @param {Array} gotoItems - (Optional) Aggregated frequent items
  * @returns {Object} JSON schedule object with item predictions
  */
-export async function analyzeOrderHistory(detailedOrders) {
-    if (!detailedOrders || detailedOrders.length === 0) {
-        return null; // Initial state or no data
+export async function analyzeOrderHistory(detailedOrders, gotoItems = []) {
+    const hasOrders = detailedOrders && detailedOrders.length > 0;
+    const hasGoto = gotoItems && gotoItems.length > 0;
+
+    if (!hasOrders && !hasGoto) {
+        return null;
     }
 
     const systemPrompt = `
-You are an intelligent grocery restocking assistant. I will provide you with a raw JSON array representing my past Swiggy Instamart detailed orders.
-Your goal is to analyze the frequency at which I order specific recurring items (like milk, eggs, bread, coffee) and calculate when I will likely need them next.
+You are an intelligent grocery restocking assistant. I will provide you with data from my Swiggy Instamart account.
+This data may include:
+1. A raw JSON array of my past "Detailed Orders" (within the last 15 days).
+2. A list of my "Go To Items" (frequently ordered recently or in the past).
+
+Your goal is to analyze these to determine recurring items (like milk, eggs, bread, coffee) and calculate when I will likely need them next.
+
+**ANALYSIS LOGIC:**
+- If "Detailed Orders" are present, use the timestamps to calculate accurate frequency (frequencyDays).
+- If only "Go To Items" are present, infer reasonable frequencies based on the item type (e.g., Milk: 3 days, Bread: 4 days, Coffee: 15 days) and set the context to "Aggregated Profile".
 
 **CRITICAL BRAND INSTRUCTION:** 
-Pay close attention to the specific brands of the items I order. 
-When generating the \`searchQuery\` and the new \`fallbackSearchQuery\`, you must:
+Pay close attention to the specific brands of the items. 
+When generating the \`searchQuery\` and \`fallbackSearchQuery\`, you must:
 1. Make the primary \`searchQuery\` specific to the exact brand I usually buy (e.g., "Amul Taaza Milk 500ml").
-2. Provide a \`fallbackSearchQuery\` that suggests an alternate reputable brand for that exact item, ONLY to be used if my preferred brand is not available (e.g., "Mother Dairy Milk 500ml"). If no clear fallback exists, make it generic (e.g., "Toned Milk 500ml").
+2. Provide a \`fallbackSearchQuery\` for a reputable alternate brand of the same variant.
 
 You must reply with ONLY a valid JSON object matching this schema:
 {
   "schedule": [
     {
-      "itemName": "String (e.g., 'Amul Taaza Milk')",
-      "searchQuery": "String (e.g., 'Amul Taaza Milk 500ml') to use in Swiggy product search",
-      "fallbackSearchQuery": "String (e.g., 'Mother Dairy Milk 500ml')",
-      "frequencyDays": Number (e.g., 3),
+      "itemName": "String",
+      "searchQuery": "String",
+      "fallbackSearchQuery": "String",
+      "frequencyDays": Number,
       "confidence": Number (1-100),
-      "lastOrderedAt": "ISO Date String",
+      "lastOrderedAt": "ISO Date String or current date",
       "nextSuggestedOrderAt": "ISO Date String"
     }
   ]
 }
 
-Skip items that were only ordered once or seem like one-off impulse buys (e.g., ice cream, a specific brand of chips that I only bought once). Focus strictly on household staples and regular grocery items. 
-Always output raw JSON. Do not include markdown formatting like \`\`\`json.
+Focus strictly on household staples and regular grocery items. 
+Always output raw JSON. Do not include markdown formatting.
 `;
 
     try {
-        const userPrompt = `Here is my detailed order history. The current date is ${new Date().toISOString()}:\n\n ${JSON.stringify(detailedOrders)}`;
+        const userPrompt = `
+CURRENT DATE: ${new Date().toISOString()}
 
-        const responseText = await llm.generateText(systemPrompt, userPrompt, 0.1);
+DETAILED ORDERS (Last 15 days):
+${JSON.stringify(detailedOrders)}
 
-        const jsonString = responseText.trim();
-        // Remove markdown formatting if the LLM disobeys the prompt slightly
-        const cleanJson = jsonString.replace(/^```json\s*/, '').replace(/\s*```$/, '');
+GO TO ITEMS (Aggregated history):
+${JSON.stringify(gotoItems)}
+`;
+        const response = await llm.generateText(systemPrompt, userPrompt);
 
-        const schedule = JSON.parse(cleanJson);
-        return schedule;
+        if (!response) {
+            console.warn("[Analyze] LLM returned empty response.");
+            return null;
+        }
 
-    } catch (error) {
-        console.error("Error analyzing order pattern:", error);
-        return null;
+        // Attempt to extract JSON from markdown if necessary
+        let jsonStr = response;
+        if (jsonStr.includes('```')) {
+            jsonStr = jsonStr.split('```')[1];
+            if (jsonStr.startsWith('json')) jsonStr = jsonStr.substring(4);
+        }
+
+        try {
+            const result = JSON.parse(jsonStr.trim());
+            return result;
+        } catch (parseErr) {
+            console.error("[Analyze] Failed to parse LLM JSON:", parseErr.message);
+            console.log("[Analyze] Raw Response:", response);
+            return null;
+        }
     }
-}
