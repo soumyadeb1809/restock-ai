@@ -37,11 +37,31 @@ bot.use(async (ctx, next) => {
 
 // Command: /start
 bot.command('start', (ctx) => {
-    ctx.reply(
-        "👋 Welcome to RestockBot!\n\n" +
-        "I'm your personal Swiggy Instamart assistant. I will learn your grocery patterns and remind you when you're running low.\n\n" +
-        "To get started, send /login to securely connect your Swiggy account."
-    );
+    sendGreeting(ctx);
+});
+
+// Helper: Send Interactive Greeting
+function sendGreeting(ctx) {
+    const greetingMsg = "👋 <b>Welcome to RestockBot!</b>\n\nI'm your personal grocery re-stocking assistant. I can analyze your past orders, predict when you need groceries, and help you restock effortlessly.\n\nHere are some things you can do:";
+
+    ctx.reply(greetingMsg, {
+        parse_mode: 'HTML',
+        reply_markup: {
+            inline_keyboard: [
+                [{ text: "📊 Analyze My Orders", callback_data: "run_new_analysis" }],
+                [{ text: "🛒 Check Today's Restock", callback_data: "check_restock_today" }],
+                [{ text: "📍 Change Delivery Address", callback_data: "change_address_prompt" }]
+            ]
+        }
+    });
+}
+
+// Callback: Trigger Address Change Command
+bot.action('change_address_prompt', async (ctx) => {
+    await ctx.answerCbQuery();
+    // Simulate the /address command
+    ctx.message = { text: '/address' };
+    bot.handleUpdate(ctx.update);
 });
 
 // Command: /login
@@ -753,6 +773,12 @@ bot.on('text', async (ctx) => {
     // 2. Otherwise, treat as a general conversational query
     else {
         try {
+            // Check for simple greetings first
+            const lowerText = text.toLowerCase().replace(/[^a-z]/g, '');
+            if (['hi', 'hello', 'hey', 'greetings', 'yo'].includes(lowerText)) {
+                return sendGreeting(ctx);
+            }
+
             const token = await getAuthToken(ctx.from.id);
             if (!token) {
                 return ctx.reply("💬 I'd love to help, but you need to /login first so I can access Swiggy for you!");
