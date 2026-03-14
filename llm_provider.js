@@ -1,5 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import OpenAI from 'openai';
 import dotenv from 'dotenv';
 
 dotenv.config();
@@ -21,6 +22,10 @@ export class LLMProvider {
         } else if (this.provider === 'gemini') {
             const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
             this.gemini = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+        } else if (this.provider === 'openai') {
+            this.openai = new OpenAI({
+                apiKey: process.env.OPENAI_API_KEY,
+            });
         }
     }
 
@@ -37,6 +42,16 @@ export class LLMProvider {
                 temperature
             });
             return response.content[0].text;
+        } else if (this.provider === 'openai') {
+            const response = await this.openai.chat.completions.create({
+                model: "gpt-4o-mini",
+                messages: [
+                    { role: "system", content: systemPrompt },
+                    { role: "user", content: userPrompt }
+                ],
+                temperature
+            });
+            return response.choices[0].message.content;
         } else {
             // Gemini
             const result = await this.gemini.generateContent({
@@ -56,6 +71,8 @@ export class LLMProvider {
     async chatWithTools(systemPrompt, messages, tools, toolHandlers) {
         if (this.provider === 'anthropic') {
             return this._chatAnthropic(systemPrompt, messages, tools, toolHandlers);
+        } else if (this.provider === 'openai') {
+            return this._chatOpenAI(systemPrompt, messages, tools, toolHandlers);
         } else {
             return this._chatGemini(systemPrompt, messages, tools, toolHandlers);
         }
@@ -95,6 +112,65 @@ export class LLMProvider {
         }
 
         return response.content[0].text;
+    }
+
+    async _chatOpenAI(system, messages, tools, handlers) {
+        let currentMessages = [
+            { role: "system", content: system },
+            ...messages.map(m => ({
+                role: m.role,
+                content: typeof m.content === 'string' ? m.content : JSON.stringify(m.content),
+                ...(m.tool_calls ? { tool_calls: m.tool_calls } : {}),
+                ...(m.tool_call_id ? { tool_call_id: m.tool_call_id } : {})
+            }))
+        ];
+
+        // Format tools for OpenAI
+        const openAITools = tools.map(t => ({
+            type: "function",
+            function: {
+                name: t.name,
+                description: t.description,
+                parameters: t.input_schema
+            }
+        }));
+
+        let response = await this.openai.chat.completions.create({
+            model: "gpt-4o-mini",
+            messages: currentMessages,
+            tools: openAITools,
+            tool_choice: "auto"
+        });
+
+        let responseMessage = response.choices[0].message;
+
+        while (responseMessage.tool_calls) {
+            currentMessages.push(responseMessage);
+
+            for (const toolCall of responseMessage.tool_calls) {
+                const { name, arguments: argsString } = toolCall.function;
+                const args = JSON.parse(argsString);
+                console.log(`[OpenAI] Executing tool: ${name}`);
+
+                const toolResult = await handlers[name](args);
+
+                currentMessages.push({
+                    role: "tool",
+                    tool_call_id: toolCall.id,
+                    name: name,
+                    content: JSON.stringify(toolResult)
+                });
+            }
+
+            response = await this.openai.chat.completions.create({
+                model: "gpt-4o-mini",
+                messages: currentMessages,
+                tools: openAITools
+            });
+            responseMessage = response.choices[0].message;
+        }
+
+        return responseMessage.content;
     }
 
     async _chatGemini(system, messages, tools, handlers) {
