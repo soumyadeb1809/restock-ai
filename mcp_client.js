@@ -131,10 +131,36 @@ export class SwiggyClient {
     }
 
     async updateCart(spinId, quantity, selectedAddressId) {
-        return this.callTool('update_cart', {
-            items: [{ spinId, quantity }],
-            selectedAddressId
-        });
+        return this.updateCartItems([{ spinId, quantity }], selectedAddressId);
+    }
+
+    async updateCartItems(items, selectedAddressId) {
+        console.log(`[SwiggyMCP] update_cart CALL: Address=${selectedAddressId}, ItemsCount=${items.length}`);
+        if (items.length < 5) console.log(`[SwiggyMCP] Payload Preview:`, JSON.stringify(items));
+
+        try {
+            const response = await this.callTool('update_cart', {
+                items,
+                selectedAddressId
+            });
+            console.log(`[SwiggyMCP] update_cart RESPONSE:`, JSON.stringify(response).substring(0, 500));
+            return response;
+        } catch (error) {
+            console.error(`[SwiggyMCP] update_cart ERROR:`, error.message);
+            throw error;
+        }
+    }
+
+    async emptyCart(selectedAddressId) {
+        console.log(`[SwiggyMCP] Dedicated clear_cart tool requested. (Address ${selectedAddressId} ignored as per tool schema)`);
+        try {
+            const response = await this.callTool('clear_cart', {});
+            console.log(`[SwiggyMCP] clear_cart RESPONSE:`, JSON.stringify(response));
+            return response;
+        } catch (error) {
+            console.error(`[SwiggyMCP] clear_cart ERROR:`, error.message);
+            throw error;
+        }
     }
 
     async getAddresses() {

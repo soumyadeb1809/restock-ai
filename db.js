@@ -65,30 +65,28 @@ export async function getAuthToken(telegramUserId) {
 
 export async function saveConsumptionSchedule(telegramUserId, scheduleData, metadata = {}) {
     try {
-        const userRef = db.collection('users').doc(telegramUserId.toString());
-        await userRef.set({
-            groceryProfile: {
-                schedule: scheduleData.schedule || scheduleData,
-                metadata: {
-                    ...metadata,
-                    completedAt: new Date().toISOString()
-                }
+        const profileRef = db.collection('grocery_profiles').doc(telegramUserId.toString());
+        await profileRef.set({
+            schedule: scheduleData.schedule || scheduleData,
+            metadata: {
+                ...metadata,
+                completedAt: new Date().toISOString()
             }
         }, { merge: true });
         return true;
     } catch (error) {
-        console.error('Error saving schedule:', error);
+        console.error('Error saving schedule to collection:', error);
         return false;
     }
 }
 
 export async function getConsumptionSchedule(telegramUserId) {
     try {
-        const userDoc = await db.collection('users').doc(telegramUserId.toString()).get();
-        if (!userDoc.exists) return null;
-        return userDoc.data().groceryProfile || null;
+        const profileDoc = await db.collection('grocery_profiles').doc(telegramUserId.toString()).get();
+        if (!profileDoc.exists) return null;
+        return profileDoc.data() || null;
     } catch (error) {
-        console.error('Error getting schedule:', error);
+        console.error('Error getting schedule from collection:', error);
         return null;
     }
 }
