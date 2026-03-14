@@ -26,6 +26,11 @@ export class LLMProvider {
             this.openai = new OpenAI({
                 apiKey: process.env.OPENAI_API_KEY,
             });
+        } else if (this.provider === 'github') {
+            this.openai = new OpenAI({
+                apiKey: process.env.GITHUB_TOKEN,
+                baseURL: "https://models.inference.ai.azure.com"
+            });
         }
     }
 
@@ -43,6 +48,16 @@ export class LLMProvider {
             });
             return response.content[0].text;
         } else if (this.provider === 'openai') {
+            const response = await this.openai.chat.completions.create({
+                model: "gpt-4o-mini",
+                messages: [
+                    { role: "system", content: systemPrompt },
+                    { role: "user", content: userPrompt }
+                ],
+                temperature
+            });
+            return response.choices[0].message.content;
+        } else if (this.provider === 'github') {
             const response = await this.openai.chat.completions.create({
                 model: "gpt-4o-mini",
                 messages: [
@@ -72,7 +87,9 @@ export class LLMProvider {
         if (this.provider === 'anthropic') {
             return this._chatAnthropic(systemPrompt, messages, tools, toolHandlers);
         } else if (this.provider === 'openai') {
-            return this._chatOpenAI(systemPrompt, messages, tools, toolHandlers);
+            return this._chatOpenAI(systemPrompt, messages, tools, toolHandlers, "gpt-4o-mini");
+        } else if (this.provider === 'github') {
+            return this._chatOpenAI(systemPrompt, messages, tools, toolHandlers, "gpt-4o-mini");
         } else {
             return this._chatGemini(systemPrompt, messages, tools, toolHandlers);
         }
@@ -114,7 +131,7 @@ export class LLMProvider {
         return response.content[0].text;
     }
 
-    async _chatOpenAI(system, messages, tools, handlers) {
+    async _chatOpenAI(system, messages, tools, handlers, model = "gpt-4o-mini") {
         let currentMessages = [
             { role: "system", content: system },
             ...messages.map(m => ({
@@ -136,7 +153,7 @@ export class LLMProvider {
         }));
 
         let response = await this.openai.chat.completions.create({
-            model: "gpt-4o-mini",
+            model: model,
             messages: currentMessages,
             tools: openAITools,
             tool_choice: "auto"
@@ -150,7 +167,7 @@ export class LLMProvider {
             for (const toolCall of responseMessage.tool_calls) {
                 const { name, arguments: argsString } = toolCall.function;
                 const args = JSON.parse(argsString);
-                console.log(`[OpenAI] Executing tool: ${name}`);
+                console.log(`[${this.provider.toUpperCase()}] Executing tool: ${name}`);
 
                 const toolResult = await handlers[name](args);
 
@@ -163,7 +180,7 @@ export class LLMProvider {
             }
 
             response = await this.openai.chat.completions.create({
-                model: "gpt-4o-mini",
+                model: model,
                 messages: currentMessages,
                 tools: openAITools
             });
