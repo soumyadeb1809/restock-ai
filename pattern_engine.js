@@ -22,15 +22,16 @@ export async function analyzeOrderHistory(detailedOrders, gotoItems = []) {
 
     const systemPrompt = `
 You are an intelligent grocery restocking assistant. I will provide you with data from my Swiggy Instamart account.
-This data may include:
-1. A raw JSON array of my past "Detailed Orders" (within the last 15 days).
+This data includes:
+1. A JSON array of my "Detailed Orders" (past order history).
 2. A list of my "Go To Items" (frequently ordered recently or in the past).
 
 Your goal is to analyze these to determine recurring items (like milk, eggs, bread, coffee) and calculate when I will likely need them next.
 
 **ANALYSIS LOGIC:**
-- If "Detailed Orders" are present, use the timestamps to calculate accurate frequency (frequencyDays).
-- If only "Go To Items" are present, infer reasonable frequencies based on the item type (e.g., Milk: 3 days, Bread: 4 days, Coffee: 15 days) and set the context to "Aggregated Profile".
+- Use the order history timestamps to calculate accurate frequency (frequencyDays). Do not limit yourself to a specific time window; analyze the entire provided history.
+- Calculate the average gap between orders for the same item to determine \`frequencyDays\`.
+- If only "Go To Items" are present, infer reasonable frequencies based on the item type (e.g., Milk: 3 days, Bread: 4 days, Coffee: 15 days).
 
 **CRITICAL BRAND INSTRUCTION:** 
 Pay close attention to the specific brands of the items. 
@@ -47,7 +48,7 @@ You must reply with ONLY a valid JSON object matching this schema:
       "fallbackSearchQuery": "String",
       "frequencyDays": Number,
       "confidence": Number (1-100),
-      "lastOrderedAt": "ISO Date String or current date",
+      "lastOrderedAt": "ISO Date String",
       "nextSuggestedOrderAt": "ISO Date String"
     }
   ]
@@ -61,7 +62,7 @@ Always output raw JSON. Do not include markdown formatting.
         const userPrompt = `
 CURRENT DATE: ${new Date().toISOString()}
 
-DETAILED ORDERS (Last 15 days):
+DETAILED ORDERS (Full fetched history):
 ${JSON.stringify(detailedOrders)}
 
 GO TO ITEMS (Aggregated history):
@@ -74,11 +75,15 @@ ${JSON.stringify(gotoItems)}
             return null;
         }
 
-        // Attempt to extract JSON from markdown if necessary
-        let jsonStr = response;
-        if (jsonStr.includes('```')) {
-            jsonStr = jsonStr.split('```')[1];
-            if (jsonStr.startsWith('json')) jsonStr = jsonStr.substring(4);
+        // Attempt to extract JSON from the response string
+        let jsonStr = response.trim();
+
+        // Find the first '{' and the last '}' to isolate the JSON object
+        const startIdx = jsonStr.indexOf('{');
+        const endIdx = jsonStr.lastIndexOf('}');
+
+        if (startIdx !== -1 && endIdx !== -1 && endIdx > startIdx) {
+            jsonStr = jsonStr.substring(startIdx, endIdx + 1);
         }
 
         try {
@@ -89,4 +94,9 @@ ${JSON.stringify(gotoItems)}
             console.log("[Analyze] Raw Response:", response);
             return null;
         }
+    } catch (error) {
+        console.error("[Analyze] Unexpected error in analyzeOrderHistory:", error);
+        return null;
     }
+}
+

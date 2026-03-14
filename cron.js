@@ -78,7 +78,7 @@ export async function checkAndOrder(telegramUserId) {
         // Notify the user
         if (addedItemsList.length > 0) {
             // Save updated schedule back to DB
-            import('./db.js').then(db => db.saveConsumptionSchedule(telegramUserId, scheduleObj));
+            import('./db.js').then(db => db.saveConsumptionSchedule(telegramUserId, scheduleObj, { initiator: 'cron' }));
 
             // Deep link directly to the Instamart cart
             const cartLink = "https://www.swiggy.com/instamart/cart";

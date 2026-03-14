@@ -1,6 +1,7 @@
 import { Telegraf } from 'telegraf';
 import dotenv from 'dotenv';
 import crypto from 'crypto';
+import fs from 'fs';
 import { saveAuthToken, getAuthToken, saveConsumptionSchedule, getConsumptionSchedule, savePreferredAddress, getPreferredAddress } from './db.js';
 import { SwiggyClient } from './mcp_client.js';
 import { analyzeOrderHistory } from './pattern_engine.js';
@@ -110,18 +111,23 @@ bot.command('analyze', async (ctx) => {
         for (const order of orderList) {
             const items = order.items || order.order_items || [];
             if (items.length > 0) {
-                detailedOrders.push({
+                const orderData = {
                     orderId: order.orderId || order.id || order.order_id,
                     createdAt: order.createdAt || order.order_time,
                     items: items.map(i => ({ name: i.name || i.item_name, quantity: i.quantity || i.item_quantity }))
-                });
+                };
+                detailedOrders.push(orderData);
             }
         }
 
         console.log(`[Analyze] Successfully processed ${detailedOrders.length} orders from history.`);
+        if (detailedOrders.length > 0) {
+            const samples = detailedOrders.slice(0, 3).map(o => `${o.orderId} (${o.createdAt})`).join(', ');
+            console.log(`[Analyze] Order summary samples: ${samples}`);
+        }
 
         // Save history to debug folder for visibility
-        fs.writeFileSync(`debug/latest_analyze_history.json`, JSON.stringify(orderList, null, 2));
+        fs.writeFileSync(`debug/latest_analyze_history.json`, JSON.stringify(detailedOrders, null, 2));
 
         ctx.reply(`✅ Fetched full details for ${detailedOrders.length} orders. Now analyzing your consumption patterns and brand preferences using Gemini...`);
 
@@ -141,10 +147,13 @@ bot.command('analyze', async (ctx) => {
         }
 
         // Analyze the detailed array + goto items
+        const payloadStr = JSON.stringify({ detailedOrders, gotoItems });
+        console.log(`[Analyze] LLM Payload size: ${(payloadStr.length / 1024).toFixed(2)} KB`);
+
         const schedule = await analyzeOrderHistory(detailedOrders, gotoItems);
 
         if (schedule && schedule.schedule) {
-            await saveConsumptionSchedule(ctx.from.id, schedule);
+            await saveConsumptionSchedule(ctx.from.id, schedule, { initiator: 'user' });
             console.log(`[Analyze] Generated schedule with ${schedule.schedule.length} items.`);
 
             let replyText = "🧠 Analysis complete! Here are the recurring items I found:\n\n";

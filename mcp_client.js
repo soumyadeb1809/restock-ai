@@ -122,10 +122,6 @@ export class SwiggyClient {
         return allOrders.slice(0, targetCount);
     }
 
-    async getOrderDetails(orderId) {
-        return this.callTool('get_order_details', { orderId });
-    }
-
     async searchProducts(query, addressId) {
         return this.callTool('search_products', { query, addressId });
     }

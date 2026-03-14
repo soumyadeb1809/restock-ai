@@ -64,10 +64,20 @@ export class LLMProvider {
                 contents: [{ role: 'user', parts: [{ text: `${systemPrompt}\n\nUSER INPUT:\n${userPrompt}` }] }],
                 generationConfig: {
                     temperature: temperature,
-                    maxOutputTokens: 2048,
+                    maxOutputTokens: 65536,
+                    responseMimeType: "application/json"
                 }
             });
-            return result.response.text();
+
+            const responseText = result.response.text();
+            const finishReason = result.response.candidates?.[0]?.finishReason;
+            console.log(`[Gemini] Response finishReason: ${finishReason}`);
+
+            if (finishReason !== 'STOP') {
+                console.warn(`[Gemini] Caution: Response finished with reason: ${finishReason}`);
+            }
+
+            return responseText;
         }
     }
 

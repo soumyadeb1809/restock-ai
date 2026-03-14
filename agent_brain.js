@@ -23,17 +23,6 @@ export async function handleUserQuery(swiggy, userQuery, addressId = null) {
             }
         },
         {
-            name: "get_order_details",
-            description: "Fetches full details for a specific order ID, including item names, quantities, and prices.",
-            input_schema: {
-                type: "object",
-                properties: {
-                    orderId: { type: "string", description: "The order ID to lookup" }
-                },
-                required: ["orderId"]
-            }
-        },
-        {
             name: "search_products",
             description: "Searches the live Swiggy Instamart catalog for products, brands, and prices.",
             input_schema: {
@@ -74,7 +63,6 @@ export async function handleUserQuery(swiggy, userQuery, addressId = null) {
     GUIDELINES:
     - Use clear, friendly, and concise language.
     - If a user asks 'what are my past orders', first call get_orders.
-    - If they ask for details about a specific recent order, call get_order_details.
     - If they search for something, use search_products.
     - If they want to add an item to their cart, use update_cart. You need a 'spinId' which you MUST get from the variations list in the search results.
     - If a product has multiple variations (different sizes/prices), ALWAYS ask the user to pick one first if they weren't specific.
@@ -92,10 +80,6 @@ export async function handleUserQuery(swiggy, userQuery, addressId = null) {
     const handlers = {
         'get_orders': async (input) => {
             const res = await swiggy.getOrders(input.count || 10);
-            return res.content?.[0]?.text || res;
-        },
-        'get_order_details': async (input) => {
-            const res = await swiggy.getOrderDetails(input.orderId);
             return res.content?.[0]?.text || res;
         },
         'search_products': async (input) => {

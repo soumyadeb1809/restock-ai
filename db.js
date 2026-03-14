@@ -63,12 +63,17 @@ export async function getAuthToken(telegramUserId) {
     }
 }
 
-export async function saveConsumptionSchedule(telegramUserId, scheduleData) {
+export async function saveConsumptionSchedule(telegramUserId, scheduleData, metadata = {}) {
     try {
         const userRef = db.collection('users').doc(telegramUserId.toString());
         await userRef.set({
-            schedule: scheduleData,
-            lastCalculatedAt: new Date().toISOString()
+            groceryProfile: {
+                schedule: scheduleData.schedule || scheduleData,
+                metadata: {
+                    ...metadata,
+                    completedAt: new Date().toISOString()
+                }
+            }
         }, { merge: true });
         return true;
     } catch (error) {
@@ -81,7 +86,7 @@ export async function getConsumptionSchedule(telegramUserId) {
     try {
         const userDoc = await db.collection('users').doc(telegramUserId.toString()).get();
         if (!userDoc.exists) return null;
-        return userDoc.data().schedule || null;
+        return userDoc.data().groceryProfile || null;
     } catch (error) {
         console.error('Error getting schedule:', error);
         return null;
