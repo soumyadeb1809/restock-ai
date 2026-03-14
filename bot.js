@@ -65,13 +65,13 @@ bot.command('login', async (ctx) => {
     const oauthUrl = `https://mcp.swiggy.com/auth/authorize?${params.toString()}`;
 
     ctx.reply(
-        "🔐 **Authentication Time**\n\n" +
+        "🔐 <b>Authentication Time</b>\n\n" +
         "1. Click the link below to log into Swiggy on your mobile browser.\n" +
-        "2. After logging in, the browser will try to redirect to `localhost` and show an error (e.g., 'Site cannot be reached'). This is expected!\n" +
-        "3. Copy the ENTIRE URL from your browser's address bar (it will look like `http://localhost/callback?code=...`).\n" +
+        "2. After logging in, the browser will try to redirect to <code>localhost</code> and show an error (e.g., 'Site cannot be reached'). This is expected!\n" +
+        "3. Copy the ENTIRE URL from your browser's address bar (it will look like <code>http://localhost/callback?code=...</code>).\n" +
         "4. Paste that URL back here to me.",
         {
-            parse_mode: 'Markdown',
+            parse_mode: 'HTML',
             reply_markup: {
                 inline_keyboard: [[{ text: "Login to Swiggy", url: oauthUrl }]]
             }
@@ -140,8 +140,8 @@ async function runAnalysis(telegramUserId) {
             await saveConsumptionSchedule(telegramUserId, schedule, { initiator: 'user' });
 
             // Send interactive completion message
-            return bot.telegram.sendMessage(telegramUserId, "🧠 **Analysis Ready!**\n\nI've analyzed your Swiggy history and updated your grocery consumption profile. What would you like to do next?", {
-                parse_mode: 'Markdown',
+            return bot.telegram.sendMessage(telegramUserId, "🧠 <b>Analysis Ready!</b>\n\nI've analyzed your Swiggy history and updated your grocery consumption profile. What would you like to do next?", {
+                parse_mode: 'HTML',
                 reply_markup: {
                     inline_keyboard: [
                         [{ text: "📊 View Full Profile", callback_data: "view_full_analysis" }],
@@ -163,7 +163,7 @@ async function runAnalysis(telegramUserId) {
 
 // Help command
 bot.command('help', (ctx) => {
-    ctx.reply("🤖 **RestockBot Commands:**\n\n- /analyze: Build your grocery consumption profile\n- /login: Connect your Swiggy account\n- /address: Set your delivery address\n- /help: Show this message\n- /debug_reset: (Debug) Force all items to be due today\n- /test_cart: (Debug) Show current cart items\n- /test_clear_cart: (Debug) Empty your Swiggy cart", { parse_mode: 'Markdown' });
+    ctx.reply("🤖 <b>RestockBot Commands:</b>\n\n- /analyze: Build your grocery consumption profile\n- /login: Connect your Swiggy account\n- /address: Set your delivery address\n- /help: Show this message\n- /debug_reset: (Debug) Force all items to be due today\n- /test_cart: (Debug) Show current cart items\n- /test_clear_cart: (Debug) Empty your Swiggy cart", { parse_mode: 'HTML' });
 });
 
 // Debug: Reset all dates to today
@@ -211,19 +211,19 @@ bot.command('test_cart', async (ctx) => {
             }
         } catch (e) { }
 
-        let msg = `🏠 **Current Address:** \`${addrStr}\` (ID: \`${addressId}\`)\n`;
-        msg += `🛒 **Cart Items (${cartItems.length}):**\n\n`;
+        let msg = `🏠 <b>Current Address:</b> <code>${addrStr}</code> (ID: <code>${addressId}</code>)\n`;
+        msg += `🛒 <b>Cart Items (${cartItems.length}):</b>\n\n`;
 
         if (cartItems.length === 0) {
-            msg += "_Your cart is empty._";
+            msg += "<i>Your cart is empty.</i>";
         } else {
             cartItems.forEach((item, idx) => {
                 const name = item.itemName || item.name || item.item_name || "Unknown Item";
-                msg += `${idx + 1}. ${name} (ID: \`${item.spinId || item.spin_id}\`)\n`;
+                msg += `${idx + 1}. ${name} (ID: <code>${item.spinId || item.spin_id}</code>)\n`;
             });
         }
 
-        ctx.reply(msg, { parse_mode: 'Markdown' });
+        ctx.reply(msg, { parse_mode: 'HTML' });
     } catch (e) {
         ctx.reply("❌ Failed to fetch cart: " + e.message);
     } finally {
@@ -259,10 +259,10 @@ bot.command('test_clear_cart', async (ctx) => {
         const count = verifyData.data?.items?.length || 0;
 
         if (count === 0) {
-            ctx.reply("✅ **Cart Cleared!** Verified via get_cart: Your cart is now empty.");
+            ctx.reply("✅ <b>Cart Cleared!</b> Verified via get_cart: Your cart is now empty.", { parse_mode: 'HTML' });
         } else {
             console.warn(`[DebugClear] Verification failed. Cart still has ${count} items.`);
-            ctx.reply(`⚠️ **Clear command sent, but cart still has ${count} items.**\n\nThis confirms the clear_cart tool is not clearing the items for address \`${addressId}\`.`);
+            ctx.reply(`⚠️ <b>Clear command sent, but cart still has ${count} items.</b>\n\nThis confirms the clear_cart tool is not clearing the items for address <code>${addressId}</code>.`, { parse_mode: 'HTML' });
         }
     } catch (e) {
         console.error(`[DebugClear] CRASH:`, e.message);
@@ -280,25 +280,29 @@ async function displaySchedule(telegramUserId, profile) {
         return bot.telegram.sendMessage(telegramUserId, "📋 Your grocery profile is empty. Try running /analyze to build one.");
     }
 
-    let replyText = "🧠 **Your Grocery Consumption Profile**\n\n";
+    let replyText = "🧠 <b>Your Grocery Consumption Profile</b>\n\n";
     if (profile.metadata) {
         const date = new Date(profile.metadata.completedAt).toLocaleDateString();
-        replyText += `_Last analyzed: ${date} (via ${profile.metadata.initiator})_\n\n`;
+        const initiator = (profile.metadata.initiator || 'unknown').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        replyText += `<i>Last analyzed: ${date} (via ${initiator})</i>\n\n`;
     }
 
     for (const item of schedule) {
-        replyText += `- **${item.itemName}** (Every ${item.frequencyDays} days)\n  _Search:_ ${item.searchQuery}\n  _Next restock:_ ${new Date(item.nextSuggestedOrderAt).toDateString()}\n\n`;
+        const safeName = (item.itemName || 'Unknown').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        const safeSearch = (item.searchQuery || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        replyText += `- <b>${safeName}</b> (Every ${item.frequencyDays} days)\n  <i>Search:</i> ${safeSearch}\n  <i>Next restock:</i> ${new Date(item.nextSuggestedOrderAt).toDateString()}\n\n`;
     }
 
     try {
         await bot.telegram.sendMessage(telegramUserId, replyText, {
-            parse_mode: 'Markdown',
+            parse_mode: 'HTML',
             reply_markup: {
                 inline_keyboard: [[{ text: "🛒 Check Today's Restock", callback_data: "check_restock_today" }]]
             }
         });
-    } catch (markdownError) {
-        await bot.telegram.sendMessage(telegramUserId, replyText, {
+    } catch (formattingError) {
+        console.error("HTML formatting error:", formattingError);
+        await bot.telegram.sendMessage(telegramUserId, replyText.replace(/<[^>]*>?/gm, ''), {
             reply_markup: {
                 inline_keyboard: [[{ text: "🛒 Check Today's Restock", callback_data: "check_restock_today" }]]
             }
@@ -315,8 +319,8 @@ bot.command('analyze', async (ctx) => {
         const today = new Date();
 
         if (lastCompleted.toDateString() === today.toDateString()) {
-            return ctx.reply("🧠 **Analysis already exists for today!**\n\nI have already processed your recent orders and built an optimized profile. Re-running analysis too often is expensive and usually not necessary.", {
-                parse_mode: 'Markdown',
+            return ctx.reply("🧠 <b>Analysis already exists for today!</b>\n\nI have already processed your recent orders and built an optimized profile. Re-running analysis too often is expensive and usually not necessary.", {
+                parse_mode: 'HTML',
                 reply_markup: {
                     inline_keyboard: [
                         [{ text: "📊 See Latest Analysis", callback_data: "view_full_analysis" }],
@@ -327,7 +331,7 @@ bot.command('analyze', async (ctx) => {
         }
     }
 
-    ctx.reply("🔍 **Analysis Started!** I'm scanning your Swiggy history now. This typically takes about 60-90 seconds...\n\nI'll notify you here as soon as your profile is ready! 🚀", { parse_mode: 'Markdown' });
+    ctx.reply("🔍 <b>Analysis Started!</b> I'm scanning your Swiggy history now. This typically takes about 60-90 seconds...\n\nI'll notify you here as soon as your profile is ready! 🚀", { parse_mode: 'HTML' });
 
     // Trigger background analysis without await
     runAnalysis(ctx.from.id);
@@ -346,7 +350,7 @@ bot.action('view_full_analysis', async (ctx) => {
 
 bot.action('run_new_analysis', async (ctx) => {
     await ctx.answerCbQuery("Starting fresh analysis...");
-    await ctx.editMessageText("🔄 **Analysis Started!** I'm fetching your fresh Swiggy history now. I'll notify you here once the results are ready! 🚀", { parse_mode: 'Markdown' });
+    await ctx.editMessageText("🔄 <b>Analysis Started!</b> I'm fetching your fresh Swiggy history now. I'll notify you here once the results are ready! 🚀", { parse_mode: 'HTML' });
 
     // Trigger background analysis without await
     runAnalysis(ctx.from.id);
@@ -402,22 +406,22 @@ bot.action('check_restock_today', async (ctx) => {
         });
 
         if (dueItems.length === 0) {
-            return ctx.reply("✅ **Everything looks good!**\n\nBased on your consumption patterns, you don't need any restocks today (or they are already in your cart).", {
-                parse_mode: 'Markdown',
+            return ctx.reply("✅ <b>Everything looks good!</b>\n\nBased on your consumption patterns, you don't need any restocks today (or they are already in your cart).", {
+                parse_mode: 'HTML',
                 reply_markup: {
                     inline_keyboard: [[{ text: "🛒 View Cart on Swiggy", url: "https://www.swiggy.com/instamart/cart" }]]
                 }
             });
         }
 
-        let replyText = "🛒 **Items due for restock today:**\n\n";
+        let replyText = "🛒 <b>Items due for restock today:</b>\n\n";
         dueItems.forEach(item => {
-            replyText += `- **${item.itemName}** (Every ${item.frequencyDays} days)\n`;
+            replyText += `- <b>${item.itemName}</b> (Every ${item.frequencyDays} days)\n`;
         });
         replyText += "\nWould you like me to add these to your Swiggy cart?";
 
         return ctx.reply(replyText, {
-            parse_mode: 'Markdown',
+            parse_mode: 'HTML',
             reply_markup: {
                 inline_keyboard: [
                     [{ text: "✅ Add to Cart", callback_data: "add_to_cart_now" }],
@@ -447,7 +451,7 @@ bot.action('add_to_cart_now', async (ctx) => {
     if (!(await swiggy.connect(token))) return ctx.reply("❌ Swiggy connection failed.");
 
     try {
-        await ctx.editMessageText("🔄 **Adding items to your cart...**", { parse_mode: 'Markdown' });
+        await ctx.editMessageText("🔄 <b>Adding items to your cart...</b>", { parse_mode: 'HTML' });
 
         const today = new Date();
         const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
@@ -576,8 +580,8 @@ bot.action('add_to_cart_now', async (ctx) => {
 
         if (addedCount > 0) {
             await saveConsumptionSchedule(telegramUserId, profile, { initiator: 'user_action' });
-            await ctx.reply(`✅ **Successfully added ${addedCount} items to your cart!**\n\nYou can now review and checkout in the Swiggy app.`, {
-                parse_mode: 'Markdown',
+            await ctx.reply(`✅ <b>Successfully added ${addedCount} items to your cart!</b>\n\nYou can now review and checkout in the Swiggy app.`, {
+                parse_mode: 'HTML',
                 reply_markup: {
                     inline_keyboard: [[{ text: "🛒 View Cart on Swiggy", url: "https://www.swiggy.com/instamart/cart" }]]
                 }
@@ -662,8 +666,8 @@ bot.command('address', async (ctx) => {
             }];
         });
 
-        ctx.reply("🎯 Please select the **exact address** that matches your active Swiggy App location:", {
-            parse_mode: 'Markdown',
+        ctx.reply("🎯 Please select the <b>exact address</b> that matches your active Swiggy App location:", {
+            parse_mode: 'HTML',
             reply_markup: {
                 inline_keyboard: buttons
             }
@@ -683,7 +687,7 @@ bot.action(/^sel_addr:(.+)$/, async (ctx) => {
 
     if (success) {
         await ctx.answerCbQuery("Address saved!");
-        await ctx.editMessageText(`✅ **Preferred address set!**\n\nI will now use this location for all search and restocking queries.`);
+        await ctx.editMessageText(`✅ <b>Preferred address set!</b>\n\nI will now use this location for all search and restocking queries.`, { parse_mode: 'HTML' });
     } else {
         await ctx.answerCbQuery("Error saving address.");
         await ctx.reply("❌ Failed to save address selection. Please try /address again.");
@@ -772,9 +776,14 @@ bot.on('text', async (ctx) => {
                 console.log(`[Query] handleUserQuery took ${duration.toFixed(2)}s`);
 
                 try {
-                    await ctx.reply(response, { parse_mode: 'Markdown' });
-                } catch (markdownError) {
-                    console.warn("Markdown parsing failed, falling back to plain text:", markdownError.message);
+                    // response is generated text from LLM. Since we switched entire bot to HTML,
+                    // but the LLM might be returning unformatted text or markdown, we should escape it
+                    // or ask the LLM to return HTML. For safety, let's keep it plain text if it might contain < > 
+                    // To keep things simple, let's just send it without formatting if it's dynamic text from LLM
+                    // or escape it if we MUST use HTML.
+                    await ctx.reply(response);
+                } catch (htmlError) {
+                    console.warn("HTML/Markdown parsing failed, falling back to plain text:", htmlError.message);
                     await ctx.reply(response);
                 }
             } finally {
