@@ -30,7 +30,7 @@
 |---|---|
 | Bot Interface | [Telegraf](https://telegraf.js.org/) (Telegram Bot) |
 | Swiggy Integration | [Swiggy MCP Server](https://github.com/Swiggy/swiggy-mcp-server-manifest) + `@modelcontextprotocol/sdk` |
-| AI Pattern Analysis | [Gemini 2.0 Flash](https://aistudio.google.com) / [OpenAI GPT-4o-mini](https://openai.com) / [Anthropic Claude 3.5](https://anthropic.com) |
+| AI Pattern Analysis | [Gemini 2.0 Flash](https://aistudio.google.com) / [Anthropic Claude 3.5](https://anthropic.com) |
 | Database | [Firebase Firestore](https://firebase.google.com) |
 | Server | [Express.js](https://expressjs.com) |
 | Hosting | [Render](https://render.com) (Free tier) |
@@ -96,9 +96,8 @@ Fill in your `.env` (see the table below for where to get each value):
 |---|---|
 | `TELEGRAM_BOT_TOKEN` | Message `@BotFather` on Telegram → `/newbot` |
 | `TELEGRAM_ALLOWED_USER_ID` | Message `@userinfobot` on Telegram |
-| `LLM_PROVIDER` | `gemini` (Free), `openai` (Cheap), or `anthropic` |
+| `LLM_PROVIDER` | `gemini` (Recommended-Free) or `anthropic` |
 | `GEMINI_API_KEY` | [aistudio.google.com](https://aistudio.google.com) → API Keys |
-| `OPENAI_API_KEY` | [platform.openai.com](https://platform.openai.com) → API Keys |
 | `ANTHROPIC_API_KEY` | [console.anthropic.com](https://console.anthropic.com) → API Keys |
 | `FIREBASE_SERVICE_ACCOUNT_PATH` | Firebase Console → Project Settings → Service Accounts → Generate new private key |
 | `CRON_SECRET` | Any random secure string you create |
