@@ -20,7 +20,7 @@ export class LLMProvider {
             });
         } else if (this.provider === 'gemini') {
             const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-            this.gemini = genAI.getGenerativeModel({ model: "gemini-flash-latest" });
+            this.gemini = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
         }
     }
 
@@ -101,7 +101,7 @@ export class LLMProvider {
         // Initialize model with tools and system instruction at the root level
         const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
         const model = genAI.getGenerativeModel({
-            model: "gemini-flash-latest",
+            model: "gemini-2.0-flash",
             systemInstruction: system,
             tools: [{
                 functionDeclarations: tools.map(t => ({

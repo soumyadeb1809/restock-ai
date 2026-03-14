@@ -82,16 +82,19 @@ export class SwiggyClient {
         return this.callTool('get_order_details', { orderId });
     }
 
-    async searchProducts(query) {
-        return this.callTool('search_products', { query });
+    async searchProducts(query, addressId) {
+        return this.callTool('search_products', { query, addressId });
     }
 
-    async getCart() {
-        return this.callTool('get_cart', {});
+    async getCart(selectedAddressId) {
+        return this.callTool('get_cart', { selectedAddressId });
     }
 
-    async updateCart(item_id, quantity) {
-        return this.callTool('update_cart', { item_id, quantity });
+    async updateCart(spinId, quantity, selectedAddressId) {
+        return this.callTool('update_cart', {
+            items: [{ spinId, quantity }],
+            selectedAddressId
+        });
     }
 
     async getAddresses() {

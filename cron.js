@@ -1,5 +1,5 @@
 import { SwiggyClient } from './mcp_client.js';
-import { getAuthToken, getConsumptionSchedule } from './db.js';
+import { getAuthToken, getConsumptionSchedule, getPreferredAddress } from './db.js';
 import bot from './bot.js';
 
 export async function checkAndOrder(telegramUserId) {
@@ -39,22 +39,30 @@ export async function checkAndOrder(telegramUserId) {
 
     try {
         let addedItemsList = [];
+        const addressId = await getPreferredAddress(telegramUserId);
+
+        if (!addressId) {
+            console.warn(`[Cron] No preferred address found for user ${telegramUserId}. Skipping restock.`);
+            bot.telegram.sendMessage(telegramUserId, "⚠️ I tried to check your restock list, but I don't know which address to use! Please type /address to select a delivery location.");
+            return;
+        }
+
         for (const item of itemsToOrder) {
             // 1. Search for the item using preferred brand querying
             console.log(`[Cron] Searching Swiggy for: ${item.searchQuery}`);
-            let searchResults = await swiggy.searchProducts(item.searchQuery);
-            let foundItemId = extractFirstItemId(searchResults);
+            let searchResults = await swiggy.searchProducts(item.searchQuery, addressId);
+            let foundSpinId = extractFirstSpinId(searchResults);
 
             // Fallback if preferred brand is out of stock or not found
-            if (!foundItemId && item.fallbackSearchQuery) {
+            if (!foundSpinId && item.fallbackSearchQuery) {
                 console.log(`[Cron] Preferred brand not found. Using fallback: ${item.fallbackSearchQuery}`);
-                searchResults = await swiggy.searchProducts(item.fallbackSearchQuery);
-                foundItemId = extractFirstItemId(searchResults);
+                searchResults = await swiggy.searchProducts(item.fallbackSearchQuery, addressId);
+                foundSpinId = extractFirstSpinId(searchResults);
             }
 
-            if (foundItemId) {
+            if (foundSpinId) {
                 // 2. Add to Cart
-                await swiggy.updateCart(foundItemId, 1);
+                await swiggy.updateCart(foundSpinId, 1, addressId);
                 addedItemsList.push(item.itemName);
 
                 // 3. Update schedule manually
@@ -98,14 +106,11 @@ export async function checkAndOrder(telegramUserId) {
     }
 }
 
-function extractFirstItemId(searchResults) {
-    // This function requires parsing the specific JSON structure returned by Swiggy's 'search_products' tool.
-    // For this boilerplate, we'll try to find any recognizable ID string.
+function extractFirstSpinId(searchResults) {
     try {
         const rawString = typeof searchResults === 'string' ? searchResults : JSON.stringify(searchResults);
-        // This is a naive regex. In reality, you'd parse the structured JSON from the Swiggy Tool return.
-        const idMatch = rawString.match(/"item_id"\s*:\s*"([^"]+)"/);
-        return idMatch ? idMatch[1] : null; // Return null if not found to prevent breaking
+        const spinIdMatch = rawString.match(/"spinId"\s*:\s*"([^"]+)"/);
+        return spinIdMatch ? spinIdMatch[1] : null;
     } catch (e) {
         return null;
     }

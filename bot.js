@@ -1,7 +1,7 @@
 import { Telegraf } from 'telegraf';
 import dotenv from 'dotenv';
 import crypto from 'crypto';
-import { saveAuthToken, getAuthToken, saveConsumptionSchedule, getConsumptionSchedule } from './db.js';
+import { saveAuthToken, getAuthToken, saveConsumptionSchedule, getConsumptionSchedule, savePreferredAddress, getPreferredAddress } from './db.js';
 import { SwiggyClient } from './mcp_client.js';
 import { analyzeOrderHistory } from './pattern_engine.js';
 import { handleUserQuery } from './agent_brain.js';
@@ -153,6 +153,70 @@ bot.command('analyze', async (ctx) => {
     }
 });
 
+// Command: /address (Select preferred delivery address)
+bot.command('address', async (ctx) => {
+    const token = await getAuthToken(ctx.from.id);
+    if (!token) {
+        return ctx.reply("❌ Please /login first to view your addresses.");
+    }
+
+    const swiggy = new SwiggyClient();
+    const connected = await swiggy.connect(token);
+    if (!connected) {
+        return ctx.reply("❌ Connection to Swiggy failed. Try /login again.");
+    }
+
+    try {
+        ctx.reply("📍 Fetching your saved addresses...");
+        const response = await swiggy.getAddresses();
+        const textContent = response.content?.[0]?.text;
+
+        let addresses = [];
+        try {
+            const parsed = textContent ? JSON.parse(textContent) : {};
+            // Try different possible structures
+            addresses = parsed.data?.addresses || parsed.addresses || (Array.isArray(parsed) ? parsed : []);
+        } catch (e) {
+            console.warn("Failed to parse addresses JSON:", e);
+        }
+
+        if (addresses.length === 0) {
+            return ctx.reply("❌ No saved addresses found in your Swiggy account.");
+        }
+
+        const buttons = addresses.map(addr => ([{
+            text: `${addr.addressTag || addr.addressCategory || 'Address'}: ${addr.addressLine}`,
+            callback_data: `sel_addr:${addr.id}`
+        }]));
+
+        ctx.reply("🎯 Please select your **preferred delivery address** for RestockBot:", {
+            parse_mode: 'Markdown',
+            reply_markup: {
+                inline_keyboard: buttons
+            }
+        });
+    } catch (e) {
+        console.error("Address Fetch Error:", e);
+        ctx.reply("❌ Error fetching addresses. Check logs.");
+    } finally {
+        await swiggy.disconnect();
+    }
+});
+
+// Handle address selection button clicks
+bot.action(/^sel_addr:(.+)$/, async (ctx) => {
+    const addressId = ctx.match[1];
+    const success = await savePreferredAddress(ctx.from.id, addressId);
+
+    if (success) {
+        await ctx.answerCbQuery("Address saved!");
+        await ctx.editMessageText(`✅ **Preferred address set!**\n\nI will now use this location for all search and restocking queries.`);
+    } else {
+        await ctx.answerCbQuery("Error saving address.");
+        await ctx.reply("❌ Failed to save address selection. Please try /address again.");
+    }
+});
+
 // Handle incoming URLs (The token capture flow) and general natural language queries
 bot.on('text', async (ctx) => {
     const text = ctx.message.text.trim();
@@ -228,8 +292,15 @@ bot.on('text', async (ctx) => {
                 // Let the user know we are working on it
                 ctx.reply("🤔 Let me check that for you...");
 
-                const response = await handleUserQuery(swiggy, text);
-                ctx.reply(response, { parse_mode: 'Markdown' });
+                const addressId = await getPreferredAddress(ctx.from.id);
+                const response = await handleUserQuery(swiggy, text, addressId);
+
+                try {
+                    await ctx.reply(response, { parse_mode: 'Markdown' });
+                } catch (markdownError) {
+                    console.warn("Markdown parsing failed, falling back to plain text:", markdownError.message);
+                    await ctx.reply(response);
+                }
             } finally {
                 await swiggy.disconnect();
             }

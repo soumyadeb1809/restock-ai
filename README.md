@@ -7,7 +7,7 @@
 ## How It Works
 
 1. **Connects** to your Swiggy Instamart account via the official [Swiggy MCP Server](https://github.com/Swiggy/swiggy-mcp-server-manifest)
-2. **Analyzes** your last 20 order's full details to detect recurring grocery items and brand preferences using Claude AI
+2. **Analyzes** your last 20 order's full details to detect recurring grocery items and brand preferences using AI (Gemini or Claude)
 3. **Tracks** when each item is expected to run out based on your consumption frequency
 4. **Alerts** you every morning via Telegram and adds the due items directly to your Swiggy Instamart cart
 5. **You checkout** — the bot never places orders on your behalf. You always have the final say.
@@ -30,7 +30,7 @@
 |---|---|
 | Bot Interface | [Telegraf](https://telegraf.js.org/) (Telegram Bot) |
 | Swiggy Integration | [Swiggy MCP Server](https://github.com/Swiggy/swiggy-mcp-server-manifest) + `@modelcontextprotocol/sdk` |
-| AI Pattern Analysis | [Anthropic Claude 3.5 Sonnet](https://anthropic.com) |
+| AI Pattern Analysis | [Gemini 2.0 Flash](https://aistudio.google.com) / [Anthropic Claude 3.5](https://anthropic.com) |
 | Database | [Firebase Firestore](https://firebase.google.com) |
 | Server | [Express.js](https://expressjs.com) |
 | Hosting | [Render](https://render.com) (Free tier) |
@@ -46,7 +46,9 @@ restock-bot/
 ├── bot.js            # Telegram bot logic (commands + login flow)
 ├── cron.js           # Daily restock checker (searches & adds to cart)
 ├── mcp_client.js     # Swiggy Instamart MCP client
-├── pattern_engine.js # Claude AI order history analyzer
+├── pattern_engine.js # AI order history analyzer
+├── agent_brain.js    # Conversational agent logic & tool orchestration
+├── llm_provider.js   # Multi-vendor LLM wrapper (Gemini/Claude)
 ├── db.js             # Firebase Firestore wrapper
 ├── .env.sample       # Environment variable template
 └── .gitignore
@@ -60,6 +62,7 @@ restock-bot/
 |---|---|
 | `/start` | Welcome message |
 | `/login` | Authenticate with your Swiggy account |
+| `/address` | List and select your preferred delivery address |
 | `/analyze` | Fetch and analyze your last 20 orders to build a restock schedule |
 
 ---
@@ -70,8 +73,8 @@ restock-bot/
 
 - Node.js ≥ 18
 - A [Telegram account](https://telegram.org)
-- An [Anthropic account](https://console.anthropic.com) (free credits available)
-- A [Firebase project](https://console.firebase.google.com) (free tier)
+- A [Google Gemini account](https://aistudio.google.com) (Free) OR [Anthropic account](https://console.anthropic.com)
+- A [Firebase project](https://console.firebase.google.com) (Free tier)
 
 ### 1. Clone the repo
 
@@ -93,6 +96,8 @@ Fill in your `.env` (see the table below for where to get each value):
 |---|---|
 | `TELEGRAM_BOT_TOKEN` | Message `@BotFather` on Telegram → `/newbot` |
 | `TELEGRAM_ALLOWED_USER_ID` | Message `@userinfobot` on Telegram |
+| `LLM_PROVIDER` | `gemini` (Recommended-Free) or `anthropic` |
+| `GEMINI_API_KEY` | [aistudio.google.com](https://aistudio.google.com) → API Keys |
 | `ANTHROPIC_API_KEY` | [console.anthropic.com](https://console.anthropic.com) → API Keys |
 | `FIREBASE_SERVICE_ACCOUNT_PATH` | Firebase Console → Project Settings → Service Accounts → Generate new private key |
 | `CRON_SECRET` | Any random secure string you create |

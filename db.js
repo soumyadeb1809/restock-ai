@@ -87,3 +87,27 @@ export async function getConsumptionSchedule(telegramUserId) {
         return null;
     }
 }
+
+export async function savePreferredAddress(telegramUserId, addressId) {
+    try {
+        const userRef = db.collection('users').doc(telegramUserId.toString());
+        await userRef.set({
+            preferredAddressId: addressId
+        }, { merge: true });
+        return true;
+    } catch (error) {
+        console.error('Error saving preferred address:', error);
+        return false;
+    }
+}
+
+export async function getPreferredAddress(telegramUserId) {
+    try {
+        const userDoc = await db.collection('users').doc(telegramUserId.toString()).get();
+        if (!userDoc.exists) return null;
+        return userDoc.data().preferredAddressId || null;
+    } catch (error) {
+        console.error('Error getting preferred address:', error);
+        return null;
+    }
+}
