@@ -20,6 +20,7 @@
 - 🧠 **Brand-Aware** — Remembers exactly which brands you prefer (e.g., Amul Taaza, not just "Milk") and only suggests alternatives if your preferred brand is unavailable
 - 🛡️ **Human-in-the-Loop** — Adds items to your cart and notifies you with a checkout link. Never places COD orders automatically
 - 📅 **Smart Scheduling** — Uses AI to infer consumption frequency from historical data (e.g., "You order milk every 3 days")
+- 🎛️ **Interactive UI** — Rich inline button menus for easy navigation and robust HTML message formatting to prevent crashes
 - ☁️ **Cloud-Ready** — Deploy for free on Render + Firebase
 
 ---
@@ -60,10 +61,11 @@ restock-bot/
 
 | Command | Description |
 |---|---|
-| `/start` | Welcome message |
+| `/start` | Interactive welcome menu (Analyze, Restock Check, Address Change) |
 | `/login` | Authenticate with your Swiggy account |
 | `/address` | List and select your preferred delivery address |
 | `/analyze` | Fetch and analyze your last 20 orders to build a restock schedule |
+| `hi`, `hello` | Natural language greetings also trigger the interactive menu |
 
 ---
 
