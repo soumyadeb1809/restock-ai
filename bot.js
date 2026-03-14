@@ -48,7 +48,7 @@ function sendGreeting(ctx) {
         parse_mode: 'HTML',
         reply_markup: {
             inline_keyboard: [
-                [{ text: "📊 Analyze My Orders", callback_data: "run_new_analysis" }],
+                [{ text: "📊 Analyze My Orders", callback_data: "analyze_prompt" }],
                 [{ text: "🛒 Check Today's Restock", callback_data: "check_restock_today" }],
                 [{ text: "📍 Change Delivery Address", callback_data: "change_address_prompt" }]
             ]
@@ -56,12 +56,16 @@ function sendGreeting(ctx) {
     });
 }
 
+// Callback: Trigger Analyze Command
+bot.action('analyze_prompt', async (ctx) => {
+    await ctx.answerCbQuery();
+    await runAnalyzeFlow(ctx);
+});
+
 // Callback: Trigger Address Change Command
 bot.action('change_address_prompt', async (ctx) => {
     await ctx.answerCbQuery();
-    // Simulate the /address command
-    ctx.message = { text: '/address' };
-    bot.handleUpdate(ctx.update);
+    await runAddressFlow(ctx);
 });
 
 // Command: /login
@@ -330,8 +334,8 @@ async function displaySchedule(telegramUserId, profile) {
     }
 }
 
-// Command: /analyze (Force an analysis of history)
-bot.command('analyze', async (ctx) => {
+// Helper: Run the Analyze Command Flow
+async function runAnalyzeFlow(ctx) {
     const profile = await getConsumptionSchedule(ctx.from.id);
 
     if (profile && profile.metadata && profile.metadata.completedAt) {
@@ -355,6 +359,11 @@ bot.command('analyze', async (ctx) => {
 
     // Trigger background analysis without await
     runAnalysis(ctx.from.id);
+}
+
+// Command: /analyze (Force an analysis of history)
+bot.command('analyze', async (ctx) => {
+    await runAnalyzeFlow(ctx);
 });
 
 // Callback: View Full Profile
@@ -643,8 +652,8 @@ function extractFirstSpinId(searchResults) {
     }
 }
 
-// Command: /address (Select preferred delivery address)
-bot.command('address', async (ctx) => {
+// Helper: Run the Address Selection Flow
+async function runAddressFlow(ctx) {
     const token = await getAuthToken(ctx.from.id);
     if (!token) {
         return ctx.reply("❌ Please /login first to view your addresses.");
@@ -698,6 +707,11 @@ bot.command('address', async (ctx) => {
     } finally {
         await swiggy.disconnect();
     }
+}
+
+// Command: /address (Select preferred delivery address)
+bot.command('address', async (ctx) => {
+    await runAddressFlow(ctx);
 });
 
 // Handle address selection button clicks
