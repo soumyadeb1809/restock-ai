@@ -43,7 +43,52 @@ export class SwiggyClient {
             return true;
         } catch (error) {
             console.error("Failed to connect to Swiggy MCP:", error);
-            // If we get 401, the token is invalid or expired
+
+            // 1. Check if the error is due to an expired JWT
+            const errorString = error.message || String(error);
+            const isJwtExpired = errorString.includes("invalid_token") || errorString.includes("JWT has expired");
+
+            if (isJwtExpired && typeof tokenData === 'object' && tokenData.refresh_token) {
+                console.log("[SwiggyClient] Access token expired. Attempting token refresh...");
+                try {
+                    const refreshResponse = await fetch('https://mcp.swiggy.com/auth/token', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                        body: new URLSearchParams({
+                            grant_type: 'refresh_token',
+                            refresh_token: tokenData.refresh_token,
+                            client_id: 'restock-bot',
+                        }).toString()
+                    });
+
+                    const newTokenData = await refreshResponse.json();
+
+                    if (refreshResponse.ok && newTokenData.access_token) {
+                        console.log("[SwiggyClient] Token refresh successful. Reconnecting...");
+                        
+                        // Re-initialize transport with the new token
+                        this.transport = new StreamableHTTPClientTransport(url, {
+                            requestInit: {
+                                headers: {
+                                    'Authorization': `Bearer ${newTokenData.access_token}`
+                                }
+                            }
+                        });
+
+                        await this.client.connect(this.transport);
+                        
+                        // Bubble up the new token so the caller can save it to the DB
+                        this.refreshedToken = newTokenData;
+                        return true;
+                    } else {
+                        console.error("[SwiggyClient] Refresh token exchange failed:", newTokenData);
+                    }
+                } catch (refreshErr) {
+                    console.error("[SwiggyClient] Error during token refresh:", refreshErr);
+                }
+            }
+
+            // If we fail refresh or don't have a token, return false
             return false;
         }
     }

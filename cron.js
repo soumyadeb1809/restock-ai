@@ -37,6 +37,12 @@ export async function checkAndOrder(telegramUserId) {
         return;
     }
 
+    // Save newly refreshed token if SwiggyClient automatically updated it during connection
+    if (swiggy.refreshedToken) {
+        console.log(`[Cron] Saving refreshed token for user ${telegramUserId}...`);
+        await saveAuthToken(telegramUserId, swiggy.refreshedToken);
+    }
+
     try {
         let addedItemsList = [];
         const addressId = await getPreferredAddress(telegramUserId);

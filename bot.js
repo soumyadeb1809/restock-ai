@@ -805,6 +805,12 @@ bot.on('text', async (ctx) => {
                 return ctx.reply("❌ I couldn't connect to Swiggy. Your token might be expired. Please /login again.");
             }
 
+            // Save refreshed token if automatically updated
+            if (swiggy.refreshedToken) {
+                console.log(`[Bot] Saving refreshed token for user ${ctx.from.id}...`);
+                await saveAuthToken(ctx.from.id, swiggy.refreshedToken);
+            }
+
             try {
                 // Let the user know we are working on it
                 ctx.reply("🤔 Let me check that for you...");
