@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: restock-bot
+    name: restock-ai
     env: node
     buildCommand: npm install
     startCommand: npm start
