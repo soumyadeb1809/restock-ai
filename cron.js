@@ -127,6 +127,16 @@ export async function checkAndOrder(telegramUserId) {
                     }
                 }
             );
+        } else {
+            // All due items failed to match (likely out of stock)
+            console.log(`[Cron] All due items failed to resolve to a spinId for user ${telegramUserId}.`);
+            bot.telegram.sendMessage(
+                telegramUserId,
+                "⚠️ <b>Restock Notification</b>\n\n" +
+                "I checked your consumption schedule, and some items are due for restock today, but they appear to be **out of stock** (or not found) on Swiggy Instamart right now.\n\n" +
+                "I wasn't able to add anything to your cart automatically. Please check the Swiggy app manually to look for alternatives.",
+                { parse_mode: 'HTML' }
+            );
         }
 
     } catch (e) {
