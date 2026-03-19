@@ -225,6 +225,17 @@ export async function checkAndOrder(telegramUserId) {
 
 function extractFirstSpinId(searchResults) {
     try {
+        const text = searchResults.content?.[0]?.text;
+        if (!text) return null;
+        
+        const parsed = JSON.parse(text);
+        const products = parsed.data?.products || [];
+        if (products.length > 0) {
+            const p = products[0];
+            return p.spinId || p.spin_id || p.variations?.[0]?.spinId || p.id;
+        }
+
+        // Fallback for widgets / carousels layout
         const rawString = typeof searchResults === 'string' ? searchResults : JSON.stringify(searchResults);
         const spinIdMatch = rawString.match(/"spinId"\s*:\s*"([^"]+)"/);
         return spinIdMatch ? spinIdMatch[1] : null;

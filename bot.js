@@ -669,25 +669,21 @@ bot.action('add_to_cart_now', async (ctx) => {
 // Helper for spinId extraction from raw search response
 function extractFirstSpinId(searchResults) {
     try {
-        // 1. Try proper JSON parsing first (most robust)
         const text = searchResults.content?.[0]?.text;
-        if (text) {
-            const data = JSON.parse(text);
-            const firstProduct = data.data?.products?.[0];
-            const firstVariation = firstProduct?.variations?.[0];
-            if (firstVariation?.spinId) {
-                return firstVariation.spinId;
-            }
+        if (!text) return null;
+        
+        const parsed = JSON.parse(text);
+        const products = parsed.data?.products || [];
+        if (products.length > 0) {
+            const p = products[0];
+            return p.spinId || p.spin_id || p.variations?.[0]?.spinId || p.id;
         }
 
-        // 2. Regex fallback (handles cases where structure might slightly differ but spinId exists)
+        // Fallback for widgets / carousels layout
         const rawString = typeof searchResults === 'string' ? searchResults : JSON.stringify(searchResults);
-        // Match both plain and escaped quotes
-        const spinIdMatch = rawString.match(/\\?"spinId\\?"\s*:\s*\\?"([^\\"]+)\\?"/);
+        const spinIdMatch = rawString.match(/"spinId"\s*:\s*"([^"]+)"/);
         return spinIdMatch ? spinIdMatch[1] : null;
-
     } catch (e) {
-        console.error("[SpinIdCheck] Error:", e);
         return null;
     }
 }
