@@ -104,7 +104,7 @@ bot.command('login', async (ctx) => {
 });
 
 // Helper: Run the full analysis flow in the background
-export async function runAnalysis(telegramUserId) {
+export async function runAnalysis(telegramUserId, initiator = 'user') {
     const token = await getAuthToken(telegramUserId);
     if (!token) {
         return bot.telegram.sendMessage(telegramUserId, "❌ You are not logged in. Please type /login to authenticate first.");
@@ -178,7 +178,7 @@ export async function runAnalysis(telegramUserId) {
         const schedule = await analyzeOrderHistory(detailedOrders, gotoItems, previousSchedule);
 
         if (schedule && schedule.schedule) {
-            await saveConsumptionSchedule(telegramUserId, schedule, { initiator: 'user' });
+            await saveConsumptionSchedule(telegramUserId, schedule, { initiator });
 
             // Send interactive completion message
             return bot.telegram.sendMessage(telegramUserId, "🧠 <b>Analysis Ready!</b>\n\nI've analyzed your Swiggy history and updated your grocery consumption profile. What would you like to do next?", {

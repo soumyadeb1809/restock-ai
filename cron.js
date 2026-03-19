@@ -36,7 +36,7 @@ export async function checkAndOrder(telegramUserId) {
     try {
         const botModule = await import('./bot.js');
         // Await the analysis so fully updated rules are in Firestore
-        await botModule.runAnalysis(telegramUserId);
+        await botModule.runAnalysis(telegramUserId, 'cron');
         console.log(`[Cron] Analysis complete. Proceeding with restock check.`);
     } catch (err) {
         console.error("[Cron] Failed to run preemptive analysis:", err);
