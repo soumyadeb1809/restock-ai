@@ -147,13 +147,13 @@ export async function checkAndOrder(telegramUserId) {
         // Notify the user
         if (addedItemsList.length > 0) {
             console.log(`[Cron] Batch Cart Update Complete. Added ${addedItemsList.length} items: ${addedItemsList.join(', ')}`);
-            // Alternative suggestions text (Markdown)
-            let altsMarkdown = "";
+            // Alternative suggestions text (HTML)
+            let altsHTML = "";
             const altKeys = Object.keys(alternativeSuggestions);
             if (altKeys.length > 0) {
-                altsMarkdown = "\n\n💡 **Alternatives Available (Out of stock items):**\n";
+                altsHTML = "\n\n💡 <b>Alternatives Available (Out of stock items):</b>\n";
                 for (const name of altKeys) {
-                    altsMarkdown += `\n**${name}**:\n` + alternativeSuggestions[name].map(a => `- ${a}`).join('\n') + "\n";
+                    altsHTML += `\n• <b>${name}</b>:\n` + alternativeSuggestions[name].map(a => `  - ${a}`).join('\n') + "\n";
                 }
             }
 
@@ -162,13 +162,13 @@ export async function checkAndOrder(telegramUserId) {
 
             bot.telegram.sendMessage(
                 telegramUserId,
-                "🛒 **Restock Alert!**\n\n" +
+                "🛒 <b>Restock Alert!</b>\n\n" +
                 "I've automatically added these to your Swiggy Instamart cart:\n\n" +
-                addedItemsList.map(item => `- ${item}`).join('\n') +
-                altsMarkdown +
+                addedItemsList.map(item => `• ${item}`).join('\n') +
+                altsHTML +
                 "\n\nClick below to review your cart and checkout safely.",
                 {
-                    parse_mode: 'Markdown',
+                    parse_mode: 'HTML',
                     reply_markup: {
                         inline_keyboard: [[{ text: "Go to Checkout", url: cartLink }]]
                     }
