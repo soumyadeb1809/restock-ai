@@ -1,6 +1,8 @@
-import { setDefaultResultOrder } from 'dns';
 // Force IPv4 to prevent ETIMEDOUT errors on networks that don't support IPv6
 setDefaultResultOrder('ipv4first');
+
+// Set Global Timezone to Indian Standard Time (IST)
+process.env.TZ = 'Asia/Kolkata';
 
 import express from 'express';
 import dotenv from 'dotenv';

@@ -1,3 +1,4 @@
+process.env.TZ = 'Asia/Kolkata';
 import { Telegraf } from 'telegraf';
 import dotenv from 'dotenv';
 import crypto from 'crypto';

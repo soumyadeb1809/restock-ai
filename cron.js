@@ -1,3 +1,4 @@
+process.env.TZ = 'Asia/Kolkata';
 import { SwiggyClient } from './mcp_client.js';
 import { getAuthToken, getConsumptionSchedule, getPreferredAddress } from './db.js';
 import bot from './bot.js';
