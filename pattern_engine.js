@@ -69,6 +69,7 @@ You must reply with ONLY a valid JSON object matching this schema:
 1. **Include ONLY**: Kitchen consumables, Cooking staples (Vegetables, Fruits, Milk, Eggs, Bread, Spices, Oil, Pulses, Meat), and Essential Household utility/consumables (Detergent, Fabric softener, Toilet paper, Floor cleaners).
 2. **Exclude ABSOLUTELY**: Flowers/Gifts, non-consumable electronics, medicines, apparel, and ornamental items. (Example: If a user ordered "Roses" or "Ganesh Idol", exclude it completely).
 3. **No One-Offs**: For an item to earn a slot in the schedule, there must be evidence of recurring consumption OR high-probability consumable intent over multiple cycles. Never include items purchased only once unless you can confidently infer a cyclic kitchen schedule requirement (e.g. Salt).
+4. **High Confidence Limit**: Only include items where your 'confidence' score is STRICTLY GREATER THAN 80. If your certainty about an item's recurrence or identity is 80 or lower, do not include it in the output schedule list.
 
 Always output raw JSON. Do not include markdown formatting.
 `;
