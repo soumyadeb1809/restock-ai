@@ -84,7 +84,7 @@ bot.command('login', async (ctx) => {
         redirect_uri: 'http://localhost/callback',
         code_challenge: codeChallenge,
         code_challenge_method: 'S256',
-        scope: 'mcp:tools'
+        scope: 'mcp:tools mcp:resources mcp:prompts'
     });
     const oauthUrl = `https://mcp.swiggy.com/auth/authorize?${params.toString()}`;
 
