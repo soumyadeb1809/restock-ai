@@ -102,7 +102,12 @@ export async function checkAndOrder(telegramUserId) {
             return;
         }
 
+        const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
+
         for (const item of itemsToOrder) {
+            // Respect API rate limits (Sleep 1.5s)
+            await delay(1500);
+
             // 1. Search for the item using preferred brand querying
             console.log(`[Cron] Searching Swiggy for: ${item.searchQuery}`);
             let searchResults = await swiggy.searchProducts(item.searchQuery, addressId);
@@ -110,6 +115,7 @@ export async function checkAndOrder(telegramUserId) {
 
             // Fallback if preferred brand is out of stock or not found
             if (!foundSpinId && item.fallbackSearchQuery) {
+                await delay(1000); // Small interval padding for fallbacks
                 console.log(`[Cron] Preferred brand not found. Using fallback: ${item.fallbackSearchQuery}`);
                 searchResults = await swiggy.searchProducts(item.fallbackSearchQuery, addressId);
                 foundSpinId = extractFirstSpinId(searchResults);
@@ -128,6 +134,7 @@ export async function checkAndOrder(telegramUserId) {
                 
                 // --- GENERIC ALTERNATIVES ---
                 if (item.genericSearchQuery) {
+                    await delay(1000); // Small interval padding for alternatives queries
                     console.log(`[Cron] Searching generic alternatives for ${item.itemName}: ${item.genericSearchQuery}`);
                     try {
                         const genericResults = await swiggy.searchProducts(item.genericSearchQuery, addressId);

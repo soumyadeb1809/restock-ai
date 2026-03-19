@@ -566,13 +566,19 @@ bot.action('add_to_cart_now', async (ctx) => {
             quantity: i.quantity || 1
         })).filter(i => i.spinId);
 
+        const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
+
         const successItems = [];
         for (const item of dueItems) {
+            // Respect API rate limits (Sleep 1.5s)
+            await delay(1500);
+
             console.log(`[AddToCart] Searching for: ${item.itemName}...`);
             const searchResults = await swiggy.searchProducts(item.searchQuery, addressId);
             let spinId = extractFirstSpinId(searchResults);
 
             if (!spinId && item.fallbackSearchQuery) {
+                await delay(1000); // Small interval padding for fallbacks
                 console.log(`[AddToCart] Trying fallback for ${item.itemName}: "${item.fallbackSearchQuery}"`);
                 const fallbackRes = await swiggy.searchProducts(item.fallbackSearchQuery, addressId);
                 spinId = extractFirstSpinId(fallbackRes);
