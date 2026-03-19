@@ -85,6 +85,7 @@ export async function checkAndOrder(telegramUserId) {
 
     try {
         let addedItemsList = [];
+        const alternativeSuggestions = {}; // Map of { itemName: [alt1, alt2] }
         const addressId = await getPreferredAddress(telegramUserId);
 
         if (!addressId) {
@@ -122,6 +123,22 @@ export async function checkAndOrder(telegramUserId) {
                 item.nextSuggestedOrderAt = nextDate.toISOString();
             } else {
                 console.log(`[Cron] Could not find any match for ${item.itemName} (even with fallback).`);
+                
+                // --- GENERIC ALTERNATIVES ---
+                if (item.genericSearchQuery) {
+                    console.log(`[Cron] Searching generic alternatives for ${item.itemName}: ${item.genericSearchQuery}`);
+                    try {
+                        const genericResults = await swiggy.searchProducts(item.genericSearchQuery, addressId);
+                        const alternatives = extractAlternativeNames(genericResults);
+                        if (alternatives.length > 0) {
+                            alternativeSuggestions[item.itemName] = alternatives;
+                            console.log(`[Cron] Found ${alternatives.length} alternatives for ${item.itemName}`);
+                        }
+                    } catch (gErr) {
+                        console.warn(`[Cron] Generic search failed for ${item.itemName}:`, gErr.message);
+                    }
+                }
+                // -----------------------------
             }
         }
 
@@ -131,14 +148,25 @@ export async function checkAndOrder(telegramUserId) {
             // Save updated schedule back to DB
             import('./db.js').then(db => db.saveConsumptionSchedule(telegramUserId, scheduleObj, { initiator: 'cron' }));
 
+            // Alternative suggestions text (Markdown)
+            let altsMarkdown = "";
+            const altKeys = Object.keys(alternativeSuggestions);
+            if (altKeys.length > 0) {
+                altsMarkdown = "\n\n💡 **Alternatives Available (Out of stock items):**\n";
+                for (const name of altKeys) {
+                    altsMarkdown += `\n**${name}**:\n` + alternativeSuggestions[name].map(a => `- ${a}`).join('\n') + "\n";
+                }
+            }
+
             // Deep link directly to the Instamart cart
             const cartLink = "https://www.swiggy.com/instamart/cart";
 
             bot.telegram.sendMessage(
                 telegramUserId,
                 "🛒 **Restock Alert!**\n\n" +
-                "I noticed you're probably running low on some essentials. I've automatically added these to your Swiggy Instamart cart:\n\n" +
+                "I've automatically added these to your Swiggy Instamart cart:\n\n" +
                 addedItemsList.map(item => `- ${item}`).join('\n') +
+                altsMarkdown +
                 "\n\nClick below to review your cart and checkout safely.",
                 {
                     parse_mode: 'Markdown',
@@ -150,11 +178,24 @@ export async function checkAndOrder(telegramUserId) {
         } else {
             // All due items failed to match (likely out of stock)
             console.log(`[Cron] All due items failed to resolve to a spinId for user ${telegramUserId}.`);
+            
+            // Alternative suggestions text (HTML)
+            let altsHTML = "";
+            const altKeys = Object.keys(alternativeSuggestions);
+            if (altKeys.length > 0) {
+                altsHTML = "\n\n💡 <b>Alternatives Available:</b>\n";
+                for (const name of altKeys) {
+                    altsHTML += `\n• <b>${name}</b>:\n` + alternativeSuggestions[name].map(a => `  - ${a}`).join('\n') + "\n";
+                }
+            }
+
             bot.telegram.sendMessage(
                 telegramUserId,
                 "⚠️ <b>Restock Notification</b>\n\n" +
                 "I checked your consumption schedule, and some items are due for restock today, but they appear to be **out of stock** (or not found) on Swiggy Instamart right now.\n\n" +
-                "I wasn't able to add anything to your cart automatically. Please check the Swiggy app manually to look for alternatives.",
+                "I wasn't able to add anything to your cart automatically." + 
+                altsHTML +
+                "\n\nPlease check the Swiggy app manually to look for other options.",
                 { parse_mode: 'HTML' }
             );
         }
@@ -174,5 +215,18 @@ function extractFirstSpinId(searchResults) {
         return spinIdMatch ? spinIdMatch[1] : null;
     } catch (e) {
         return null;
+    }
+}
+
+function extractAlternativeNames(searchResults) {
+    try {
+        const text = searchResults.content?.[0]?.text;
+        if (!text) return [];
+        const parsed = JSON.parse(text);
+        const products = parsed.data?.products || [];
+        // Extract top 3 names
+        return products.slice(0, 3).map(p => p.displayName || p.name).filter(Boolean);
+    } catch (e) {
+        return [];
     }
 }

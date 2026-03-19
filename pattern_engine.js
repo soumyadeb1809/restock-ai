@@ -46,6 +46,7 @@ Your goal is to analyze these to determine recurring items (like milk, eggs, bre
 2. **Include Variant Specs**: Primary \`searchQuery\` must be extremely specific. Include weights/volumes (e.g., "300 ml x 6 packs", "500 g").
 3. **Determine Set Quantity**: Set the \`quantity\` field for the number of typical *packs* to trigger at once. **If you are uncertain about the correct pack size, ALWAYS default to the lowest available quantity or pack size to prevent over-ordering.**
 4. Provide a reputable \`fallbackSearchQuery\` of the **exact same variant/pack size** where possible.
+5. **Generic Alternative Search**: Provide a loose, brandless lookup term (e.g., "Whole Wheat Bread", "Cooking Oil") in \`genericSearchQuery\`. This will be used to look up restock substitutes if your primary listings are fully out of stock.
 
 You must reply with ONLY a valid JSON object matching this schema:
 {
@@ -54,6 +55,7 @@ You must reply with ONLY a valid JSON object matching this schema:
       "itemName": "String",
       "searchQuery": "String",
       "fallbackSearchQuery": "String",
+      "genericSearchQuery": "String",
       "quantity": Number,
       "frequencyDays": Number,
       "confidence": Number (1-100),
