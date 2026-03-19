@@ -5,13 +5,38 @@ import bot from './bot.js';
 export async function checkAndOrder(telegramUserId) {
     console.log(`[Cron] Running daily check for user ${telegramUserId}...`);
 
+    const today = new Date();
+
+    // --- PROACTIVE TOKEN EXPIRATION CHECK ---
+    try {
+        const token = await getAuthToken(telegramUserId);
+        const accessToken = token && (typeof token === 'string' ? token : token.access_token);
+        
+        if (accessToken) {
+            const payload = JSON.parse(Buffer.from(accessToken.split('.')[1], 'base64').toString());
+            if (payload && payload.exp) {
+                const expirationTimeMs = payload.exp * 1000;
+                const oneDayInMs = 24 * 60 * 60 * 1000;
+                const isExpiringSoon = (expirationTimeMs - today.getTime()) < oneDayInMs;
+
+                if (isExpiringSoon) {
+                    const hoursLeft = Math.round((expirationTimeMs - today.getTime()) / (1000 * 60 * 60));
+                    console.log(`[Cron] Token for ${telegramUserId} is expiring soon (${hoursLeft}h left). Notifying user...`);
+                    bot.telegram.sendMessage(telegramUserId, `⚠️ <b>Swiggy Session Alert</b>\n\nYour Swiggy login session will expire in approximately ${hoursLeft} hours. Please use /login soon to keep your daily restock alerts running smoothly!`, { parse_mode: 'HTML' });
+                }
+            }
+        }
+    } catch (err) {
+        console.warn("[Cron] Failed to verify token expiration date during proactive check:", err.message);
+    }
+    // ----------------------------------------
+
     const scheduleObj = await getConsumptionSchedule(telegramUserId);
     if (!scheduleObj || !scheduleObj.schedule) {
         console.log(`[Cron] No schedule found for user ${telegramUserId}.`);
         return;
     }
 
-    const today = new Date();
     const itemsToOrder = scheduleObj.schedule.filter(item => {
         const nextOrderDate = new Date(item.nextSuggestedOrderAt);
         // Is the next order date today or in the past?
@@ -42,29 +67,6 @@ export async function checkAndOrder(telegramUserId) {
         console.log(`[Cron] Saving refreshed token for user ${telegramUserId}...`);
         await saveAuthToken(telegramUserId, swiggy.refreshedToken);
     }
-
-    // --- TOKEN EXPIRATION CHECK ---
-    try {
-        const accessToken = typeof token === 'string' ? token : token.access_token;
-        if (accessToken) {
-            // Decodes the payload of the JWT
-            const payload = JSON.parse(Buffer.from(accessToken.split('.')[1], 'base64').toString());
-            if (payload && payload.exp) {
-                const expirationTimeMs = payload.exp * 1000;
-                const oneDayInMs = 24 * 60 * 60 * 1000;
-                const isExpiringSoon = (expirationTimeMs - today.getTime()) < oneDayInMs;
-
-                if (isExpiringSoon) {
-                    const hoursLeft = Math.round((expirationTimeMs - today.getTime()) / (1000 * 60 * 60));
-                    console.log(`[Cron] Token for ${telegramUserId} is expiring soon (${hoursLeft}h left). Notifying user...`);
-                    bot.telegram.sendMessage(telegramUserId, `⚠️ <b>Swiggy Session Alert</b>\n\nYour Swiggy login session will expire in approximately ${hoursLeft} hours. Please use /login soon to keep your daily restock alerts running smoothly!`, { parse_mode: 'HTML' });
-                }
-            }
-        }
-    } catch (err) {
-        console.warn("[Cron] Failed to verify token expiration date:", err.message);
-    }
-    // ------------------------------
 
     try {
         let addedItemsList = [];
