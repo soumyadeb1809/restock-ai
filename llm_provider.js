@@ -60,6 +60,7 @@ export class LLMProvider {
             return response.choices[0].message.content;
         } else {
             // Gemini
+            console.log(`[Gemini] Sending request for analysis generation (${GEMINI_MODEL})...`);
             const result = await this.gemini.generateContent({
                 contents: [{ role: 'user', parts: [{ text: `${systemPrompt}\n\nUSER INPUT:\n${userPrompt}` }] }],
                 generationConfig: {

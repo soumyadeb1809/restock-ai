@@ -82,6 +82,7 @@ ${JSON.stringify(gotoItems)}
 PREVIOUS SCHEDULE (Preserve these rules/frequencies unless explicitly deprecated):
 ${JSON.stringify(previousSchedule)}
 `;
+        console.log(`[Analyze] Triggering LLM (${process.env.LLM_PROVIDER || 'gemini'}) to analyze order dimensions & rules...`);
         const response = await llm.generateText(systemPrompt, userPrompt);
 
         if (!response) {
