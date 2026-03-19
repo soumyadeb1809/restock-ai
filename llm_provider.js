@@ -7,9 +7,9 @@ dotenv.config();
 
 const provider = process.env.LLM_PROVIDER || 'gemini'; // default to gemini as it's free
 
-const GEMINI_MODEL = "gemini-2.5-flash";
-const CLAUDE_MODEL = "claude-3-5-sonnet-20241022";
-const OPENAI_MODEL = "gpt-4o-mini";
+const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-2.5-flash";
+const CLAUDE_MODEL = process.env.CLAUDE_MODEL || "claude-3-5-sonnet-20241022";
+const OPENAI_MODEL = process.env.OPENAI_MODEL || "gpt-4o-mini";
 
 console.log(`[LLMProvider] Global Config: Provider=${provider}, Model=${GEMINI_MODEL}`);
 
