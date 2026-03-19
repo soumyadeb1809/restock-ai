@@ -107,10 +107,13 @@ export async function checkAndOrder(telegramUserId) {
             }
 
             if (foundSpinId) {
+                const orderQuantity = item.quantity || 1;
                 // 2. Add to Cart
-                await swiggy.updateCart(foundSpinId, 1, addressId);
-                console.log(`[Cron] Successfully added ${item.itemName} to cart (SpinId: ${foundSpinId})`);
-                addedItemsList.push(item.itemName);
+                await swiggy.updateCart(foundSpinId, orderQuantity, addressId);
+                console.log(`[Cron] Successfully added ${item.itemName} (x${orderQuantity}) to cart (SpinId: ${foundSpinId})`);
+                
+                const displayName = orderQuantity > 1 ? `${item.itemName} (x${orderQuantity})` : item.itemName;
+                addedItemsList.push(displayName);
 
                 // 3. Update schedule manually
                 item.lastOrderedAt = today.toISOString();
