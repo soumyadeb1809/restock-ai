@@ -45,6 +45,13 @@ export async function checkAndOrder(telegramUserId) {
 
     if (itemsToOrder.length === 0) {
         console.log(`[Cron] No items need restocking today for user ${telegramUserId}.`);
+        
+        // Still trigger background Analysis to keep data fresh!
+        console.log(`[Cron] Triggering automatic schedule update and history analysis for ${telegramUserId}...`);
+        import('./bot.js').then(m => m.runAnalysis(telegramUserId)).catch(err => {
+            console.error("[Cron] Failed to run continuous background analysis:", err);
+        });
+
         return;
     }
 
@@ -138,6 +145,13 @@ export async function checkAndOrder(telegramUserId) {
                 { parse_mode: 'HTML' }
             );
         }
+
+        // --- AUTOMATIC BACKGROUND RE-ANALYSIS ---
+        console.log(`[Cron] Triggering automatic schedule update and history analysis for ${telegramUserId}...`);
+        import('./bot.js').then(m => m.runAnalysis(telegramUserId)).catch(err => {
+            console.error("[Cron] Failed to run continuous background analysis:", err);
+        });
+        // ----------------------------------------
 
     } catch (e) {
         console.error("[Cron] Error during auto-order:", e);
