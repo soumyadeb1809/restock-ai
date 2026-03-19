@@ -1,4 +1,4 @@
-# 🛒 Restock
+# 🛒 RestockAI
 
 > An intelligent Telegram bot that learns your Swiggy Instamart grocery habits and automatically adds items to your cart when you're running low.
 
