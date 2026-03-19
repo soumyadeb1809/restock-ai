@@ -5,11 +5,11 @@
 ---
 
 ## How It Works
-
+ 
 1. **Connects** to your Swiggy Instamart account via the official [Swiggy MCP Server](https://github.com/Swiggy/swiggy-mcp-server-manifest)
-2. **Analyzes** your last 20 order's full details to detect recurring grocery items and brand preferences using AI (Gemini or Claude)
-3. **Tracks** when each item is expected to run out based on your consumption frequency
-4. **Alerts** you every morning via Telegram and adds the due items directly to your Swiggy Instamart cart
+2. **Analyzes** your order history and favorite "Go To Items" to accurately detect recurring items with correct pack sizes/weights.
+3. **Tracks** when each item is expected to run out, and **automatically re-analyzes your history daily** to maintain a dynamic, non-drifting schedule.
+4. **Alerts** you every morning via Telegram and adds the due items directly to your Swiggy Instamart cart based on deduced pack count.
 5. **You checkout** — the bot never places orders on your behalf. You always have the final say.
 
 ---
@@ -17,9 +17,9 @@
 ## Features
 
 - 🔒 **Strictly Private** — Only responds to your personal Telegram account (allowlist by user ID)
-- 🧠 **Brand-Aware** — Remembers exactly which brands you prefer (e.g., Amul Taaza, not just "Milk") and only suggests alternatives if your preferred brand is unavailable
-- 🛡️ **Human-in-the-Loop** — Adds items to your cart and notifies you with a checkout link. Never places COD orders automatically
-- 📅 **Smart Scheduling** — Uses AI to infer consumption frequency from historical data (e.g., "You order milk every 3 days")
+- 🧠 **Brand & Variant Aware** — Cross-references orders with catalog items to lock onto exact weights/volumes. Defaults to conservative (lowest) quantities if ever uncertain to avoid overbuying.
+- 🛡️ **Human-in-into-the-Loop** — Adds items to your cart and notifies you with a checkout link. Never places COD orders automatically
+- 📅 **Smart Scheduling** — Uses AI to infer consumption frequency from historical data, preserving your existing schedules seamlessly when merging updates.
 - 🎛️ **Interactive UI** — Rich inline button menus for easy navigation and robust HTML message formatting to prevent crashes
 - ☁️ **Cloud-Ready** — Deploy for free on Render + Firebase
 
