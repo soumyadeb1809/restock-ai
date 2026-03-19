@@ -1,0 +1,9 @@
+# Dockerignore to keep image small and ignore environment secrets
+node_modules
+npm-debug.log
+.env
+.DS_Store
+debug/
+.git
+.gitignore
+README.md
