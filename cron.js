@@ -61,6 +61,8 @@ export async function checkAndOrder(telegramUserId) {
         return;
     }
 
+    console.log(`[Cron] Found ${itemsToOrder.length} items due for restock today: ${itemsToOrder.map(i => i.itemName).join(', ')}`);
+
     const token = await getAuthToken(telegramUserId);
     if (!token) {
         bot.telegram.sendMessage(telegramUserId, "⚠️ I tried to restock your groceries, but your Swiggy session expired. Please type /login to reconnect.");
@@ -107,6 +109,7 @@ export async function checkAndOrder(telegramUserId) {
             if (foundSpinId) {
                 // 2. Add to Cart
                 await swiggy.updateCart(foundSpinId, 1, addressId);
+                console.log(`[Cron] Successfully added ${item.itemName} to cart (SpinId: ${foundSpinId})`);
                 addedItemsList.push(item.itemName);
 
                 // 3. Update schedule manually
@@ -121,6 +124,7 @@ export async function checkAndOrder(telegramUserId) {
 
         // Notify the user
         if (addedItemsList.length > 0) {
+            console.log(`[Cron] Batch Cart Update Complete. Added ${addedItemsList.length} items: ${addedItemsList.join(', ')}`);
             // Save updated schedule back to DB
             import('./db.js').then(db => db.saveConsumptionSchedule(telegramUserId, scheduleObj, { initiator: 'cron' }));
 
