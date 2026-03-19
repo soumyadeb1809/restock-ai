@@ -104,7 +104,7 @@ bot.command('login', async (ctx) => {
 });
 
 // Helper: Run the full analysis flow in the background
-async function runAnalysis(telegramUserId) {
+export async function runAnalysis(telegramUserId) {
     const token = await getAuthToken(telegramUserId);
     if (!token) {
         return bot.telegram.sendMessage(telegramUserId, "❌ You are not logged in. Please type /login to authenticate first.");
@@ -134,7 +134,13 @@ async function runAnalysis(telegramUserId) {
                 const orderData = {
                     orderId: order.orderId || order.id || order.order_id,
                     createdAt: order.createdAt || order.order_time,
-                    items: items.map(i => ({ name: i.name || i.item_name, quantity: i.quantity || i.item_quantity }))
+                    items: items.map(i => {
+                        const formatted = { ...i };
+                        // Normalize core fields for safety, but KEEP everything else (weight, pack_size, etc.)
+                        if (!formatted.name) formatted.name = i.item_name;
+                        if (!formatted.quantity) formatted.quantity = i.item_quantity;
+                        return formatted;
+                    })
                 };
                 detailedOrders.push(orderData);
             }
@@ -166,7 +172,10 @@ async function runAnalysis(telegramUserId) {
             console.warn("Failed to fetch Go To items:", gotoErr.message);
         }
 
-        const schedule = await analyzeOrderHistory(detailedOrders, gotoItems);
+        const scheduleObj = await getConsumptionSchedule(telegramUserId);
+        const previousSchedule = scheduleObj?.schedule || [];
+
+        const schedule = await analyzeOrderHistory(detailedOrders, gotoItems, previousSchedule);
 
         if (schedule && schedule.schedule) {
             await saveConsumptionSchedule(telegramUserId, schedule, { initiator: 'user' });
