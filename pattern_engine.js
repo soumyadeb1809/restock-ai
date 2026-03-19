@@ -42,11 +42,10 @@ Your goal is to analyze these to determine recurring items (like milk, eggs, bre
 - If only "Go To Items" are present, infer reasonable frequencies based on the item type (e.g., Milk: 3 days, Bread: 4 days, Coffee: 15 days).
 
 **CRITICAL BRAND & VARIANT INSTRUCTION:** 
-Pay close attention to the specific brands, **Exact Variants, Pack Sizes, and Weights/Volumes** of the items in the order history.
-When generating the \`searchQuery\` and \`fallbackSearchQuery\`, you must:
-1. **Include Variant Specs**: Primary \`searchQuery\` must be extremely specific. If the user buys "Licious Eggs 6 pcs", do NOT just search "Licious Eggs". Include the pack size (e.g., "Licious Rich Eggs 6 pcs").
-2. **Determine Set Quantity**: Calculate how many units/packs are typically ordered in a single shipment (e.g., 1 pack, 2 bottles). Set the \`quantity\` field accordingly for a single restock cycle.
-3. Provide a \`fallbackSearchQuery\` for a reputable alternate brand of the **exact same variant/pack size** where possible.
+1. **Cross-Reference Lists**: The 'DETAILED ORDERS' list contains basic item names. The 'GO TO ITEMS' list contains richer metadata with detailed \`variations\` and \`quantityDescription\` (e.g., "300 ml x 6"). If an item appears in both lists, **strictly use the pack size/descriptions from the 'GO TO ITEMS' list** to model your suggested order variant.
+2. **Include Variant Specs**: Primary \`searchQuery\` must be extremely specific. Include weights/volumes (e.g., "300 ml x 6 packs", "500 g").
+3. **Determine Set Quantity**: Set the \`quantity\` field for the number of typical *packs* to trigger at once.
+4. Provide a reputable \`fallbackSearchQuery\` of the **exact same variant/pack size** where possible.
 
 You must reply with ONLY a valid JSON object matching this schema:
 {
