@@ -12,6 +12,13 @@ dotenv.config();
 const app = express();
 app.use(express.json());
 
+// Logger middleware for exposed endpoints
+app.use((req, res, next) => {
+    const now = new Date().toISOString();
+    console.log(`[${now}] ${req.method} ${req.url}`);
+    next();
+});
+
 const PORT = process.env.PORT || 3000;
 const WEBHOOK_DOMAIN = process.env.RENDER_EXTERNAL_URL || `http://localhost:${PORT}`;
 const TELEGRAM_ALLOWED_USER_ID = process.env.TELEGRAM_ALLOWED_USER_ID;
