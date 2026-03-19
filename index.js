@@ -1,3 +1,5 @@
+import { setDefaultResultOrder } from 'dns';
+
 // Force IPv4 to prevent ETIMEDOUT errors on networks that don't support IPv6
 setDefaultResultOrder('ipv4first');
 
