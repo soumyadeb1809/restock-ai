@@ -42,7 +42,7 @@ bot.command('start', (ctx) => {
 
 // Helper: Send Interactive Greeting
 function sendGreeting(ctx) {
-    const greetingMsg = "👋 <b>Welcome to RestockBot!</b>\n\nI'm your personal grocery re-stocking assistant. I can analyze your past orders, predict when you need groceries, and help you restock effortlessly.\n\nHere are some things you can do:";
+    const greetingMsg = "👋 <b>Welcome to RestockAI!</b>\n\nI'm your personal grocery re-stocking assistant. I can analyze your past orders, predict when you need groceries, and help you restock effortlessly.\n\nHere are some things you can do:";
 
     ctx.reply(greetingMsg, {
         parse_mode: 'HTML',
@@ -187,7 +187,7 @@ async function runAnalysis(telegramUserId) {
 
 // Help command
 bot.command('help', (ctx) => {
-    ctx.reply("🤖 <b>RestockBot Commands:</b>\n\n- /analyze: Build your grocery consumption profile\n- /login: Connect your Swiggy account\n- /address: Set your delivery address\n- /help: Show this message\n- /debug_reset: (Debug) Force all items to be due today\n- /test_cart: (Debug) Show current cart items\n- /test_clear_cart: (Debug) Empty your Swiggy cart", { parse_mode: 'HTML' });
+    ctx.reply("🤖 <b>RestockAI Commands:</b>\n\n- /analyze: Build your grocery consumption profile\n- /login: Connect your Swiggy account\n- /address: Set your delivery address\n- /help: Show this message\n- /debug_reset: (Debug) Force all items to be due today\n- /test_cart: (Debug) Show current cart items\n- /test_clear_cart: (Debug) Empty your Swiggy cart", { parse_mode: 'HTML' });
 });
 
 // Debug: Reset all dates to today

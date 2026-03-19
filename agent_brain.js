@@ -57,7 +57,7 @@ export async function handleUserQuery(swiggy, userQuery, addressId = null) {
         }
     ];
 
-    const systemPrompt = `You are RestockBot, the user's personal Swiggy Instamart assistant.
+    const systemPrompt = `You are RestockAI, the user's personal Swiggy Instamart assistant.
     Your goal is to answer questions about their order history, search for products, and manage their cart.
     
     GUIDELINES:

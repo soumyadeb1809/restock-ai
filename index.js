@@ -30,7 +30,7 @@ if (process.env.RENDER_EXTERNAL_URL) {
 
 // Health check endpoint (for Render / ping services)
 app.get('/ping', (req, res) => {
-    res.send('Pong! RestockBot is alive.');
+    res.send('Pong! RestockAI is alive.');
 });
 
 // Manual trigger for the daily cron job.
@@ -58,7 +58,7 @@ app.get('/run-daily-check', async (req, res) => {
 });
 
 app.listen(PORT, () => {
-    console.log(`RestockBot server is running on port ${PORT}`);
+    console.log(`RestockAI server is running on port ${PORT}`);
 });
 
 // Enable graceful stop
