@@ -5,8 +5,17 @@ import crypto from 'crypto';
 import fs from 'fs';
 import { saveAuthToken, getAuthToken, saveConsumptionSchedule, getConsumptionSchedule, savePreferredAddress, getPreferredAddress } from './db.js';
 import { SwiggyClient } from './mcp_client.js';
-import { analyzeOrderHistory } from './pattern_engine.js';
+import { analyzeOrderHistory, resolveItemsWithSearchResults } from './pattern_engine.js';
 import { handleUserQuery } from './agent_brain.js';
+
+const parseProducts = (res) => {
+    try {
+        const text = res.content?.[0]?.text;
+        if (!text) return [];
+        const parsed = JSON.parse(text);
+        return parsed.data?.products || [];
+    } catch { return []; }
+};
 
 dotenv.config();
 
@@ -569,39 +578,50 @@ bot.action('add_to_cart_now', async (ctx) => {
         const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 
         const successItems = [];
+        const bundles = [];
+
         for (const item of dueItems) {
-            console.log(`[AddToCart] Searching for: ${item.itemName}...`);
-            const searchResults = await swiggy.searchProducts(item.searchQuery, addressId);
-            let spinId = extractFirstSpinId(searchResults, item.itemName);
+            console.log(`[AddToCart] Aggregating searches for: ${item.itemName}`);
+            const pool = [];
 
-            if (!spinId && item.fallbackSearchQuery) {
-                await delay(500); // Small interval padding for fallbacks
-                console.log(`[AddToCart] Trying fallback for ${item.itemName}: "${item.fallbackSearchQuery}"`);
-                const fallbackRes = await swiggy.searchProducts(item.fallbackSearchQuery, addressId);
-                spinId = extractFirstSpinId(fallbackRes, item.itemName);
+            try {
+                const res = await swiggy.searchProducts(item.searchQuery, addressId);
+                pool.push(...parseProducts(res));
+            } catch (e) { }
+
+            if (item.fallbackSearchQuery) {
+                await delay(500);
+                try {
+                    const res = await swiggy.searchProducts(item.fallbackSearchQuery, addressId);
+                    pool.push(...parseProducts(res));
+                } catch (e) { }
             }
 
-            if (!spinId && item.genericSearchQuery) {
-                await delay(500); // Small interval padding for alternatives queries
-                console.log(`[AddToCart] Trying generic alternative for ${item.itemName}: "${item.genericSearchQuery}"`);
-                const genericRes = await swiggy.searchProducts(item.genericSearchQuery, addressId);
-                const altSpinId = extractFirstSpinId(genericRes, item.itemName);
-                if (altSpinId) {
-                    spinId = altSpinId;
-                    const altNames = extractAlternativeNames(genericRes);
-                    const altName = altNames[0] || "Alternative";
-                    item.itemName += ` (Alternative: ${altName})`;
-                }
+            if (item.genericSearchQuery) {
+                await delay(500);
+                try {
+                    const res = await swiggy.searchProducts(item.genericSearchQuery, addressId);
+                    pool.push(...parseProducts(res));
+                } catch (e) { }
             }
 
-            if (spinId) {
-                // Add to our update list if not already there
-                if (!updateList.some(u => u.spinId === spinId)) {
-                    updateList.push({ spinId: spinId, quantity: 1 });
-                    successItems.push(item.itemName);
+            bundles.push({
+                itemName: item.itemName,
+                searchResults: pool
+            });
+        }
+
+        if (bundles.length > 0) {
+            const decision = await resolveItemsWithSearchResults(bundles);
+            for (const res of decision.results || []) {
+                if (res.spinId) {
+                    if (!updateList.some(u => u.spinId === res.spinId)) {
+                        updateList.push({ spinId: res.spinId, quantity: 1 });
+                        successItems.push(`${res.itemName} (${res.resolvedName || "Matched"})`);
+                    }
+                } else {
+                    console.log(`[AddToCart] LLM could not resolve item ${res.itemName}. Reason: ${res.reason || "None"}`);
                 }
-            } else {
-                console.log(`[AddToCart] ❌ Could not find spinId for "${item.itemName}"`);
             }
         }
 

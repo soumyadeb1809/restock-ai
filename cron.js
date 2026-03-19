@@ -1,7 +1,17 @@
 process.env.TZ = 'Asia/Kolkata';
 import { SwiggyClient } from './mcp_client.js';
-import { getAuthToken, getConsumptionSchedule, getPreferredAddress } from './db.js';
+import { getAuthToken, getConsumptionSchedule, getPreferredAddress, saveAuthToken } from './db.js';
+import { resolveItemsWithSearchResults } from './pattern_engine.js';
 import bot from './bot.js';
+
+const parseProducts = (res) => {
+    try {
+        const text = res.content?.[0]?.text;
+        if (!text) return [];
+        const parsed = JSON.parse(text);
+        return parsed.data?.products || [];
+    } catch { return []; }
+};
 
 export async function checkAndOrder(telegramUserId) {
     console.log(`[Cron] Running daily check for user ${telegramUserId}...`);
@@ -101,62 +111,65 @@ export async function checkAndOrder(telegramUserId) {
             bot.telegram.sendMessage(telegramUserId, "⚠️ I tried to check your restock list, but I don't know which address to use! Please type /address to select a delivery location.");
             return;
         }
-
+        const bundles = [];
         const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 
         for (const item of itemsToOrder) {
-            // 1. Search for the item using preferred brand querying
-            console.log(`[Cron] Searching Swiggy for: ${item.searchQuery}`);
-            let searchResults = await swiggy.searchProducts(item.searchQuery, addressId);
-            let foundSpinId = extractFirstSpinId(searchResults, item.itemName);
+            console.log(`[Cron] Aggregating searches for: ${item.itemName}`);
+            const pool = [];
 
-            // Fallback 1: Fallback Search Query
-            if (!foundSpinId && item.fallbackSearchQuery) {
-                await delay(500); // Small interval padding for fallbacks
-                console.log(`[Cron] Preferred brand not found. Using fallback: ${item.fallbackSearchQuery}`);
-                searchResults = await swiggy.searchProducts(item.fallbackSearchQuery, addressId);
-                foundSpinId = extractFirstSpinId(searchResults, item.itemName);
+            try {
+                const res = await swiggy.searchProducts(item.searchQuery, addressId);
+                pool.push(...parseProducts(res));
+            } catch (e) {
+                console.warn(`[Cron] Preferred search failed for ${item.itemName}:`, e.message);
             }
 
-            // Fallback 2: Generic Alternatives (Add to Cart Support)
-            let isAlternative = false;
-            let altDisplayName = "";
-
-            if (!foundSpinId && item.genericSearchQuery) {
-                await delay(500); // Small interval padding for alternatives queries
-                console.log(`[Cron] Searching generic alternatives for ${item.itemName}: ${item.genericSearchQuery}`);
+            if (item.fallbackSearchQuery) {
+                await delay(500);
                 try {
-                    const genericResults = await swiggy.searchProducts(item.genericSearchQuery, addressId);
-                    foundSpinId = extractFirstSpinId(genericResults, item.itemName);
-                    if (foundSpinId) {
-                        isAlternative = true;
-                        const altNames = extractAlternativeNames(genericResults);
-                        altDisplayName = altNames[0] || "Alternative";
-                    } else {
-                        // Store full list for notification failures IF it still fails
-                        const alternatives = extractAlternativeNames(genericResults);
-                        if (alternatives.length > 0) {
-                            alternativeSuggestions[item.itemName] = alternatives;
-                        }
-                    }
-                } catch (gErr) {
-                    console.warn(`[Cron] Generic search failed for ${item.itemName}:`, gErr.message);
-                }
+                    const res = await swiggy.searchProducts(item.fallbackSearchQuery, addressId);
+                    pool.push(...parseProducts(res));
+                } catch (e) { }
             }
 
-            if (foundSpinId) {
-                const orderQuantity = item.quantity || 1;
-                // 2. Add to Cart
-                await swiggy.updateCart(foundSpinId, orderQuantity, addressId);
-                console.log(`[Cron] Successfully added ${item.itemName} (Alt: ${isAlternative}) to cart (SpinId: ${foundSpinId})`);
+            if (item.genericSearchQuery) {
+                await delay(500);
+                try {
+                    const res = await swiggy.searchProducts(item.genericSearchQuery, addressId);
+                    pool.push(...parseProducts(res));
+                } catch (e) { }
+            }
 
-                let displayName = orderQuantity > 1 ? `${item.itemName} (x${orderQuantity})` : item.itemName;
-                if (isAlternative) {
-                    displayName += ` (Alternative: ${altDisplayName})`;
+            bundles.push({
+                itemName: item.itemName,
+                searchResults: pool
+            });
+        }
+
+        if (bundles.length > 0) {
+            const decision = await resolveItemsWithSearchResults(bundles);
+            
+            for (const res of decision.results || []) {
+                if (res.spinId) {
+                     const originalItem = itemsToOrder.find(i => i.itemName === res.itemName);
+                     const qty = originalItem?.quantity || 1;
+
+                     try {
+                         await swiggy.updateCart(res.spinId, qty, addressId);
+                         console.log(`[Cron] Added ${res.itemName} to cart (spinId: ${res.spinId})`);
+                         addedItemsList.push(`${res.itemName} (${res.resolvedName || "Matched"})`);
+                     } catch (cartErr) {
+                         console.error(`[Cron] Failed to add ${res.itemName} to cart:`, cartErr.message);
+                     }
+                } else {
+                     console.log(`[Cron] LLM could not resolve item ${res.itemName}. Reason: ${res.reason || "None"}`);
+                     const originalBundle = bundles.find(b => b.itemName === res.itemName);
+                     if (originalBundle && originalBundle.searchResults) {
+                         // Extract top 3 product names from the pool for suggestion readout
+                         alternativeSuggestions[res.itemName] = originalBundle.searchResults.slice(0, 3).map(p => p.displayName || p.name).filter(Boolean);
+                     }
                 }
-                addedItemsList.push(displayName);
-            } else {
-                console.log(`[Cron] Could not find any match for ${item.itemName} (even with generic).`);
             }
         }
 

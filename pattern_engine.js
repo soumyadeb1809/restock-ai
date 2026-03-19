@@ -122,3 +122,66 @@ ${JSON.stringify(previousSchedule)}
     }
 }
 
+/**
+ * Uses the LLM to pick the absolute best matching item from aggregated search results.
+ * 
+ * @param {Array} bundles - [{ itemName, searchResults: [] }]
+ * @returns {Object} { results: [{ itemName, spinId, resolvedName, reason }] }
+ */
+export async function resolveItemsWithSearchResults(bundles) {
+    if (!bundles || bundles.length === 0) return { results: [] };
+
+    const systemPrompt = `
+You are an intelligent shopping assistant for Swiggy Instamart.
+Your goal is to look at a list of due restock items, and for EACH item, select the **absolute best match** from the provided search results list to add into the shopping cart.
+
+**RULES:**
+1. **Strict Quantity Matching**: You must match the weight/volume (e.g., 200g, 1kg, 500ml, 6 pieces) specified in the \`itemName\` or \`target\` description accurately. Do not pick a 1kg variation if the request asks for 200g unless NO other variation is loaded.
+2. **Fallback Tolerance**: If the preferred brand is not found, select the best generic alternative that matches item identity and quantity rules.
+3. **Format**: Always output raw JSON. Do not include markdown formatting.
+
+Expected Output Structure:
+{
+  "results": [
+    {
+      "itemName": "String (Original Requested Name)",
+      "spinId": "String (The accurate item spinId to Add)",
+      "resolvedName": "String (The display name of the chosen item variation)",
+      "reason": "String (Why you picked this match)"
+    }
+  ]
+}
+`;
+
+    const userPrompt = `
+Here are the due restock items and their gathered search product pools:
+
+${JSON.stringify(bundles, null, 2)}
+
+Please pick the best \`spinId\` for each item and return the JSON dictionary structure.
+`;
+
+    try {
+        console.log(`[Resolve] Triggering LLM for selection bundle of ${bundles.length} items...`);
+        const response = await llm.generateText(systemPrompt, userPrompt);
+        if (!response) {
+            console.error("[Resolve] Empty response from LLM.");
+            return { results: [] };
+        }
+
+        let jsonStr = response.trim();
+        const startIdx = jsonStr.indexOf('{');
+        const endIdx = jsonStr.lastIndexOf('}');
+
+        if (startIdx !== -1 && endIdx !== -1 && endIdx > startIdx) {
+            jsonStr = jsonStr.substring(startIdx, endIdx + 1);
+        }
+
+        const result = JSON.parse(jsonStr.trim());
+        return result;
+
+    } catch (e) {
+        console.error("[Resolve] Unexpected error during item resolution:", e);
+        return { results: [] };
+    }
+}
