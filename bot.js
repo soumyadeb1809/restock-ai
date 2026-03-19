@@ -141,7 +141,15 @@ async function runAnalysis(telegramUserId) {
         }
 
         console.log(`[Analyze] Successfully processed ${detailedOrders.length} orders from history.`);
-        fs.writeFileSync(`debug/latest_analyze_history.json`, JSON.stringify(detailedOrders, null, 2));
+        
+        try {
+            if (!fs.existsSync('debug')) {
+                fs.mkdirSync('debug');
+            }
+            fs.writeFileSync(`debug/latest_analyze_history.json`, JSON.stringify(detailedOrders, null, 2));
+        } catch (fsErr) {
+            console.warn("[Analyze] Failed to write debug history file:", fsErr.message);
+        }
 
         // Fetch Go To Items
         let gotoItems = [];
