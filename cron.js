@@ -58,6 +58,7 @@ export async function checkAndOrder(telegramUserId) {
 
     if (itemsToOrder.length === 0) {
         console.log(`[Cron] No items need restocking today for user ${telegramUserId}.`);
+        bot.telegram.sendMessage(telegramUserId, "✅ <b>Restock Check Complete</b>\n\nNo items are due for restock today! Your consumption schedule looks fully up to date.", { parse_mode: 'HTML' });
         return;
     }
 
