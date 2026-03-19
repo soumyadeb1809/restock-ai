@@ -110,7 +110,7 @@ export async function checkAndOrder(telegramUserId) {
             let searchResults = await swiggy.searchProducts(item.searchQuery, addressId);
             let foundSpinId = extractFirstSpinId(searchResults);
 
-            // Fallback if preferred brand is out of stock or not found
+            // Fallback 1: Fallback Search Query
             if (!foundSpinId && item.fallbackSearchQuery) {
                 await delay(500); // Small interval padding for fallbacks
                 console.log(`[Cron] Preferred brand not found. Using fallback: ${item.fallbackSearchQuery}`);
@@ -118,33 +118,45 @@ export async function checkAndOrder(telegramUserId) {
                 foundSpinId = extractFirstSpinId(searchResults);
             }
 
+            // Fallback 2: Generic Alternatives (Add to Cart Support)
+            let isAlternative = false;
+            let altDisplayName = "";
+
+            if (!foundSpinId && item.genericSearchQuery) {
+                await delay(500); // Small interval padding for alternatives queries
+                console.log(`[Cron] Searching generic alternatives for ${item.itemName}: ${item.genericSearchQuery}`);
+                try {
+                    const genericResults = await swiggy.searchProducts(item.genericSearchQuery, addressId);
+                    foundSpinId = extractFirstSpinId(genericResults);
+                    if (foundSpinId) {
+                        isAlternative = true;
+                        const altNames = extractAlternativeNames(genericResults);
+                        altDisplayName = altNames[0] || "Alternative";
+                    } else {
+                        // Store full list for notification failures IF it still fails
+                        const alternatives = extractAlternativeNames(genericResults);
+                        if (alternatives.length > 0) {
+                            alternativeSuggestions[item.itemName] = alternatives;
+                        }
+                    }
+                } catch (gErr) {
+                    console.warn(`[Cron] Generic search failed for ${item.itemName}:`, gErr.message);
+                }
+            }
+
             if (foundSpinId) {
                 const orderQuantity = item.quantity || 1;
                 // 2. Add to Cart
                 await swiggy.updateCart(foundSpinId, orderQuantity, addressId);
-                console.log(`[Cron] Successfully added ${item.itemName} (x${orderQuantity}) to cart (SpinId: ${foundSpinId})`);
+                console.log(`[Cron] Successfully added ${item.itemName} (Alt: ${isAlternative}) to cart (SpinId: ${foundSpinId})`);
 
-                const displayName = orderQuantity > 1 ? `${item.itemName} (x${orderQuantity})` : item.itemName;
+                let displayName = orderQuantity > 1 ? `${item.itemName} (x${orderQuantity})` : item.itemName;
+                if (isAlternative) {
+                    displayName += ` (Alternative: ${altDisplayName})`;
+                }
                 addedItemsList.push(displayName);
             } else {
-                console.log(`[Cron] Could not find any match for ${item.itemName} (even with fallback).`);
-
-                // --- GENERIC ALTERNATIVES ---
-                if (item.genericSearchQuery) {
-                    await delay(500); // Small interval padding for alternatives queries
-                    console.log(`[Cron] Searching generic alternatives for ${item.itemName}: ${item.genericSearchQuery}`);
-                    try {
-                        const genericResults = await swiggy.searchProducts(item.genericSearchQuery, addressId);
-                        const alternatives = extractAlternativeNames(genericResults);
-                        if (alternatives.length > 0) {
-                            alternativeSuggestions[item.itemName] = alternatives;
-                            console.log(`[Cron] Found ${alternatives.length} alternatives for ${item.itemName}`);
-                        }
-                    } catch (gErr) {
-                        console.warn(`[Cron] Generic search failed for ${item.itemName}:`, gErr.message);
-                    }
-                }
-                // -----------------------------
+                console.log(`[Cron] Could not find any match for ${item.itemName} (even with generic).`);
             }
         }
 

@@ -581,6 +581,19 @@ bot.action('add_to_cart_now', async (ctx) => {
                 spinId = extractFirstSpinId(fallbackRes);
             }
 
+            if (!spinId && item.genericSearchQuery) {
+                await delay(500); // Small interval padding for alternatives queries
+                console.log(`[AddToCart] Trying generic alternative for ${item.itemName}: "${item.genericSearchQuery}"`);
+                const genericRes = await swiggy.searchProducts(item.genericSearchQuery, addressId);
+                const altSpinId = extractFirstSpinId(genericRes);
+                if (altSpinId) {
+                    spinId = altSpinId;
+                    const altNames = extractAlternativeNames(genericRes);
+                    const altName = altNames[0] || "Alternative";
+                    item.itemName += ` (Alternative: ${altName})`;
+                }
+            }
+
             if (spinId) {
                 // Add to our update list if not already there
                 if (!updateList.some(u => u.spinId === spinId)) {
@@ -874,5 +887,19 @@ bot.catch((err, ctx) => {
     console.error(`[Bot] Error for update ${ctx.update.update_id}:`, err);
     ctx.reply("⚠️ Oops! Something went wrong while processing your request. Please try again later.");
 });
+
+// Helper for extracting top 3 alternative names from search responses
+function extractAlternativeNames(searchResults) {
+    try {
+        const text = searchResults.content?.[0]?.text;
+        if (!text) return [];
+        const parsed = JSON.parse(text);
+        const products = parsed.data?.products || [];
+        // Extract top 3 names
+        return products.slice(0, 3).map(p => p.displayName || p.name).filter(Boolean);
+    } catch (e) {
+        return [];
+    }
+}
 
 export default bot;
