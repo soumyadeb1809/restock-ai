@@ -19,7 +19,8 @@
 - 🔒 **Strictly Private** — Only responds to your personal Telegram account (allowlist by user ID)
 - 🧠 **Brand & Variant Aware** — Cross-references orders with catalog items to lock onto exact weights/volumes. Defaults to conservative (lowest) quantities if ever uncertain to avoid overbuying.
 - 🛡️ **Human-in-the-Loop** — Adds items to your cart and notifies you with a checkout link. Never places COD orders automatically
-- 📅 **Smart Scheduling** — Uses AI to infer consumption frequency from historical data, preserving your existing schedules seamlessly when merging updates.
+- 📅 **Smart Scheduling** — Uses AI to infer consumption frequency from historical data, and **resolves batch item matches via the LLM** to strictly enforce accurate weights/capacities.
+- 🐳 **Docker Powered** — Easily containerized for deploying on local servers or cloud providers.
 - 🎛️ **Interactive UI** — Rich inline button menus for easy navigation and robust HTML message formatting to prevent crashes
 - ☁️ **Cloud-Ready** — Deploy for free on Render + Firebase
 
@@ -101,6 +102,9 @@ Fill in your `.env` (see the table below for where to get each value):
 | `LLM_PROVIDER` | `gemini` (Recommended-Free) or `anthropic` |
 | `GEMINI_API_KEY` | [aistudio.google.com](https://aistudio.google.com) → API Keys |
 | `ANTHROPIC_API_KEY` | [console.anthropic.com](https://console.anthropic.com) → API Keys |
+| `GEMINI_MODEL` | `gemini-2.5-flash` (Optional/Default) |
+| `CLAUDE_MODEL` | `claude-3-5-sonnet-20241022` (Optional/Default) |
+| `RECOMMENDATION_CONFIDENCE` | `80` (Optional. Lower = looser filtering) |
 | `FIREBASE_SERVICE_ACCOUNT_PATH` | Firebase Console → Project Settings → Service Accounts → Generate new private key |
 | `CRON_SECRET` | Any random secure string you create |
 
