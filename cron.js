@@ -149,26 +149,26 @@ export async function checkAndOrder(telegramUserId) {
 
         if (bundles.length > 0) {
             const decision = await resolveItemsWithSearchResults(bundles);
-            
+
             for (const res of decision.results || []) {
                 if (res.spinId) {
-                     const originalItem = itemsToOrder.find(i => i.itemName === res.itemName);
-                     const qty = originalItem?.quantity || 1;
+                    const originalItem = itemsToOrder.find(i => i.itemName === res.itemName);
+                    const qty = originalItem?.quantity || 1;
 
-                     try {
-                         await swiggy.updateCart(res.spinId, qty, addressId);
-                         console.log(`[Cron] Added ${res.itemName} to cart (spinId: ${res.spinId})`);
-                         addedItemsList.push(`${res.itemName} (${res.resolvedName || "Matched"})`);
-                     } catch (cartErr) {
-                         console.error(`[Cron] Failed to add ${res.itemName} to cart:`, cartErr.message);
-                     }
+                    try {
+                        await swiggy.updateCart(res.spinId, qty, addressId);
+                        console.log(`[Cron] Added ${res.itemName} to cart (spinId: ${res.spinId})`);
+                        addedItemsList.push(`${res.itemName} (${res.resolvedName || "Matched"})`);
+                    } catch (cartErr) {
+                        console.error(`[Cron] Failed to add ${res.itemName} to cart:`, cartErr.message);
+                    }
                 } else {
-                     console.log(`[Cron] LLM could not resolve item ${res.itemName}. Reason: ${res.reason || "None"}`);
-                     const originalBundle = bundles.find(b => b.itemName === res.itemName);
-                     if (originalBundle && originalBundle.searchResults) {
-                         // Extract top 3 product names from the pool for suggestion readout
-                         alternativeSuggestions[res.itemName] = originalBundle.searchResults.slice(0, 3).map(p => p.displayName || p.name).filter(Boolean);
-                     }
+                    console.log(`[Cron] LLM could not resolve item ${res.itemName}. Reason: ${res.reason || "None"}`);
+                    const originalBundle = bundles.find(b => b.itemName === res.itemName);
+                    if (originalBundle && originalBundle.searchResults) {
+                        // Extract top 3 product names from the pool for suggestion readout
+                        alternativeSuggestions[res.itemName] = originalBundle.searchResults.slice(0, 3).map(p => p.displayName || p.name).filter(Boolean);
+                    }
                 }
             }
         }
@@ -199,7 +199,7 @@ export async function checkAndOrder(telegramUserId) {
                 {
                     parse_mode: 'HTML',
                     reply_markup: {
-                        inline_keyboard: [[{ text: "Go to Checkout", url: cartLink }]]
+                        inline_keyboard: [[{ text: "🛒 View Cart on Swiggy", url: cartLink }]]
                     }
                 }
             );
@@ -233,56 +233,5 @@ export async function checkAndOrder(telegramUserId) {
         bot.telegram.sendMessage(telegramUserId, "⚠️ I tried to add your restock items to the cart, but encountered an error. Please check your Swiggy app manually.");
     } finally {
         await swiggy.disconnect();
-    }
-}
-
-function extractFirstSpinId(searchResults, targetDescription = "") {
-    try {
-        const text = searchResults.content?.[0]?.text;
-        if (!text) return null;
-        
-        const parsed = JSON.parse(text);
-        const products = parsed.data?.products || [];
-        if (products.length > 0) {
-            const p = products[0];
-            const variations = p.variations || [];
-
-            // If variations exist, find the best match based on quantity/unit
-            if (variations.length > 0 && targetDescription) {
-                const targetLower = targetDescription.toLowerCase();
-                const targetMatch = targetLower.match(/(\d+)\s*(g|kg|ml|l|pieces|packs)/i);
-
-                if (targetMatch) {
-                    const token = targetMatch[0].trim().replace(/\s+/g, ''); // e.g. "200g" or "1kg"
-                    const bestVar = variations.find(v => {
-                        const vName = (v.displayName || v.name || "").toLowerCase().replace(/\s+/g, '');
-                        return vName.includes(token);
-                    });
-                    if (bestVar) return bestVar.spinId || bestVar.spin_id || bestVar.id;
-                }
-            }
-
-            return p.spinId || p.spin_id || p.variations?.[0]?.spinId || p.id;
-        }
-
-        // Fallback for widgets / carousels layout
-        const rawString = typeof searchResults === 'string' ? searchResults : JSON.stringify(searchResults);
-        const spinIdMatch = rawString.match(/"spinId"\s*:\s*"([^"]+)"/);
-        return spinIdMatch ? spinIdMatch[1] : null;
-    } catch (e) {
-        return null;
-    }
-}
-
-function extractAlternativeNames(searchResults) {
-    try {
-        const text = searchResults.content?.[0]?.text;
-        if (!text) return [];
-        const parsed = JSON.parse(text);
-        const products = parsed.data?.products || [];
-        // Extract top 3 names
-        return products.slice(0, 3).map(p => p.displayName || p.name).filter(Boolean);
-    } catch (e) {
-        return [];
     }
 }
