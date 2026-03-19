@@ -18,7 +18,7 @@
 
 - 🔒 **Strictly Private** — Only responds to your personal Telegram account (allowlist by user ID)
 - 🧠 **Brand & Variant Aware** — Cross-references orders with catalog items to lock onto exact weights/volumes. Defaults to conservative (lowest) quantities if ever uncertain to avoid overbuying.
-- 🛡️ **Human-in-into-the-Loop** — Adds items to your cart and notifies you with a checkout link. Never places COD orders automatically
+- 🛡️ **Human-in-the-Loop** — Adds items to your cart and notifies you with a checkout link. Never places COD orders automatically
 - 📅 **Smart Scheduling** — Uses AI to infer consumption frequency from historical data, preserving your existing schedules seamlessly when merging updates.
 - 🎛️ **Interactive UI** — Rich inline button menus for easy navigation and robust HTML message formatting to prevent crashes
 - ☁️ **Cloud-Ready** — Deploy for free on Render + Firebase
