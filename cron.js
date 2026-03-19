@@ -31,6 +31,19 @@ export async function checkAndOrder(telegramUserId) {
     }
     // ----------------------------------------
 
+    // --- 1. RUN ANALYSIS FIRST ---
+    console.log(`[Cron] Triggering automatic schedule update and history analysis for ${telegramUserId}...`);
+    try {
+        const botModule = await import('./bot.js');
+        // Await the analysis so fully updated rules are in Firestore
+        await botModule.runAnalysis(telegramUserId);
+        console.log(`[Cron] Analysis complete. Proceeding with restock check.`);
+    } catch (err) {
+        console.error("[Cron] Failed to run preemptive analysis:", err);
+        // We continue anyway so we don't completely skip restocking if the AI fails
+    }
+    // ------------------------------
+
     const scheduleObj = await getConsumptionSchedule(telegramUserId);
     if (!scheduleObj || !scheduleObj.schedule) {
         console.log(`[Cron] No schedule found for user ${telegramUserId}.`);
@@ -45,13 +58,6 @@ export async function checkAndOrder(telegramUserId) {
 
     if (itemsToOrder.length === 0) {
         console.log(`[Cron] No items need restocking today for user ${telegramUserId}.`);
-        
-        // Still trigger background Analysis to keep data fresh!
-        console.log(`[Cron] Triggering automatic schedule update and history analysis for ${telegramUserId}...`);
-        import('./bot.js').then(m => m.runAnalysis(telegramUserId)).catch(err => {
-            console.error("[Cron] Failed to run continuous background analysis:", err);
-        });
-
         return;
     }
 
@@ -145,13 +151,6 @@ export async function checkAndOrder(telegramUserId) {
                 { parse_mode: 'HTML' }
             );
         }
-
-        // --- AUTOMATIC BACKGROUND RE-ANALYSIS ---
-        console.log(`[Cron] Triggering automatic schedule update and history analysis for ${telegramUserId}...`);
-        import('./bot.js').then(m => m.runAnalysis(telegramUserId)).catch(err => {
-            console.error("[Cron] Failed to run continuous background analysis:", err);
-        });
-        // ----------------------------------------
 
     } catch (e) {
         console.error("[Cron] Error during auto-order:", e);
