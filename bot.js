@@ -148,7 +148,7 @@ export async function runAnalysis(telegramUserId, initiator = 'user') {
         }
 
         console.log(`[Analyze] Successfully processed ${detailedOrders.length} orders from history.`);
-        
+
         try {
             if (!fs.existsSync('debug')) {
                 fs.mkdirSync('debug');
@@ -570,15 +570,12 @@ bot.action('add_to_cart_now', async (ctx) => {
 
         const successItems = [];
         for (const item of dueItems) {
-            // Respect API rate limits (Sleep 1.5s)
-            await delay(1500);
-
             console.log(`[AddToCart] Searching for: ${item.itemName}...`);
             const searchResults = await swiggy.searchProducts(item.searchQuery, addressId);
             let spinId = extractFirstSpinId(searchResults);
 
             if (!spinId && item.fallbackSearchQuery) {
-                await delay(1000); // Small interval padding for fallbacks
+                await delay(500); // Small interval padding for fallbacks
                 console.log(`[AddToCart] Trying fallback for ${item.itemName}: "${item.fallbackSearchQuery}"`);
                 const fallbackRes = await swiggy.searchProducts(item.fallbackSearchQuery, addressId);
                 spinId = extractFirstSpinId(fallbackRes);
@@ -628,8 +625,8 @@ bot.action('add_to_cart_now', async (ctx) => {
         }
 
         if (addedCount > 0) {
-            await ctx.telegram.editMessageText(ctx.chat.id, statusMessage.message_id, undefined, 
-                `✅ <b>Successfully added ${addedCount} items to your cart!</b>\n\nYou can now review and checkout in the Swiggy app.`, 
+            await ctx.telegram.editMessageText(ctx.chat.id, statusMessage.message_id, undefined,
+                `✅ <b>Successfully added ${addedCount} items to your cart!</b>\n\nYou can now review and checkout in the Swiggy app.`,
                 {
                     parse_mode: 'HTML',
                     reply_markup: {
@@ -638,14 +635,14 @@ bot.action('add_to_cart_now', async (ctx) => {
                 }
             );
         } else {
-            await ctx.telegram.editMessageText(ctx.chat.id, statusMessage.message_id, undefined, 
+            await ctx.telegram.editMessageText(ctx.chat.id, statusMessage.message_id, undefined,
                 "⚠️ I couldn't find matches for the items due today. Please try searching for them manually in the Swiggy app."
             );
         }
     } catch (e) {
         console.error("Add to Cart Error:", e);
         try {
-            await ctx.telegram.editMessageText(ctx.chat.id, statusMessage.message_id, undefined, 
+            await ctx.telegram.editMessageText(ctx.chat.id, statusMessage.message_id, undefined,
                 "❌ <b>Failed to complete cart update.</b> Please try again or check logs.", { parse_mode: 'HTML' }
             );
         } catch (editErr) {

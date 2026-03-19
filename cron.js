@@ -12,7 +12,7 @@ export async function checkAndOrder(telegramUserId) {
     try {
         const token = await getAuthToken(telegramUserId);
         const accessToken = token && (typeof token === 'string' ? token : token.access_token);
-        
+
         if (accessToken) {
             const payload = JSON.parse(Buffer.from(accessToken.split('.')[1], 'base64').toString());
             if (payload && payload.exp) {
@@ -55,10 +55,10 @@ export async function checkAndOrder(telegramUserId) {
 
     const itemsToOrder = scheduleObj.schedule.filter(item => {
         if (!item.itemName) return false;
-        
+
         const nextOrder = new Date(item.nextSuggestedOrderAt);
         const nextOrderStart = new Date(nextOrder.getFullYear(), nextOrder.getMonth(), nextOrder.getDate());
-        
+
         // Is the next order date today or in the past?
         return nextOrderStart <= todayStart;
     });
@@ -105,9 +105,6 @@ export async function checkAndOrder(telegramUserId) {
         const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 
         for (const item of itemsToOrder) {
-            // Respect API rate limits (Sleep 1.5s)
-            await delay(1500);
-
             // 1. Search for the item using preferred brand querying
             console.log(`[Cron] Searching Swiggy for: ${item.searchQuery}`);
             let searchResults = await swiggy.searchProducts(item.searchQuery, addressId);
@@ -115,7 +112,7 @@ export async function checkAndOrder(telegramUserId) {
 
             // Fallback if preferred brand is out of stock or not found
             if (!foundSpinId && item.fallbackSearchQuery) {
-                await delay(1000); // Small interval padding for fallbacks
+                await delay(500); // Small interval padding for fallbacks
                 console.log(`[Cron] Preferred brand not found. Using fallback: ${item.fallbackSearchQuery}`);
                 searchResults = await swiggy.searchProducts(item.fallbackSearchQuery, addressId);
                 foundSpinId = extractFirstSpinId(searchResults);
@@ -126,15 +123,15 @@ export async function checkAndOrder(telegramUserId) {
                 // 2. Add to Cart
                 await swiggy.updateCart(foundSpinId, orderQuantity, addressId);
                 console.log(`[Cron] Successfully added ${item.itemName} (x${orderQuantity}) to cart (SpinId: ${foundSpinId})`);
-                
+
                 const displayName = orderQuantity > 1 ? `${item.itemName} (x${orderQuantity})` : item.itemName;
                 addedItemsList.push(displayName);
             } else {
                 console.log(`[Cron] Could not find any match for ${item.itemName} (even with fallback).`);
-                
+
                 // --- GENERIC ALTERNATIVES ---
                 if (item.genericSearchQuery) {
-                    await delay(1000); // Small interval padding for alternatives queries
+                    await delay(500); // Small interval padding for alternatives queries
                     console.log(`[Cron] Searching generic alternatives for ${item.itemName}: ${item.genericSearchQuery}`);
                     try {
                         const genericResults = await swiggy.searchProducts(item.genericSearchQuery, addressId);
@@ -184,7 +181,7 @@ export async function checkAndOrder(telegramUserId) {
         } else {
             // All due items failed to match (likely out of stock)
             console.log(`[Cron] All due items failed to resolve to a spinId for user ${telegramUserId}.`);
-            
+
             // Alternative suggestions text (HTML)
             let altsHTML = "";
             const altKeys = Object.keys(alternativeSuggestions);
@@ -199,7 +196,7 @@ export async function checkAndOrder(telegramUserId) {
                 telegramUserId,
                 "⚠️ <b>Restock Notification</b>\n\n" +
                 "I checked your consumption schedule, and some items are due for restock today, but they appear to be **out of stock** (or not found) on Swiggy Instamart right now.\n\n" +
-                "I wasn't able to add anything to your cart automatically." + 
+                "I wasn't able to add anything to your cart automatically." +
                 altsHTML +
                 "\n\nPlease check the Swiggy app manually to look for other options.",
                 { parse_mode: 'HTML' }
