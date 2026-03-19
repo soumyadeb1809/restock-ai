@@ -108,14 +108,14 @@ export async function checkAndOrder(telegramUserId) {
             // 1. Search for the item using preferred brand querying
             console.log(`[Cron] Searching Swiggy for: ${item.searchQuery}`);
             let searchResults = await swiggy.searchProducts(item.searchQuery, addressId);
-            let foundSpinId = extractFirstSpinId(searchResults);
+            let foundSpinId = extractFirstSpinId(searchResults, item.itemName);
 
             // Fallback 1: Fallback Search Query
             if (!foundSpinId && item.fallbackSearchQuery) {
                 await delay(500); // Small interval padding for fallbacks
                 console.log(`[Cron] Preferred brand not found. Using fallback: ${item.fallbackSearchQuery}`);
                 searchResults = await swiggy.searchProducts(item.fallbackSearchQuery, addressId);
-                foundSpinId = extractFirstSpinId(searchResults);
+                foundSpinId = extractFirstSpinId(searchResults, item.itemName);
             }
 
             // Fallback 2: Generic Alternatives (Add to Cart Support)
@@ -127,7 +127,7 @@ export async function checkAndOrder(telegramUserId) {
                 console.log(`[Cron] Searching generic alternatives for ${item.itemName}: ${item.genericSearchQuery}`);
                 try {
                     const genericResults = await swiggy.searchProducts(item.genericSearchQuery, addressId);
-                    foundSpinId = extractFirstSpinId(genericResults);
+                    foundSpinId = extractFirstSpinId(genericResults, item.itemName);
                     if (foundSpinId) {
                         isAlternative = true;
                         const altNames = extractAlternativeNames(genericResults);
@@ -223,7 +223,7 @@ export async function checkAndOrder(telegramUserId) {
     }
 }
 
-function extractFirstSpinId(searchResults) {
+function extractFirstSpinId(searchResults, targetDescription = "") {
     try {
         const text = searchResults.content?.[0]?.text;
         if (!text) return null;
@@ -232,6 +232,23 @@ function extractFirstSpinId(searchResults) {
         const products = parsed.data?.products || [];
         if (products.length > 0) {
             const p = products[0];
+            const variations = p.variations || [];
+
+            // If variations exist, find the best match based on quantity/unit
+            if (variations.length > 0 && targetDescription) {
+                const targetLower = targetDescription.toLowerCase();
+                const targetMatch = targetLower.match(/(\d+)\s*(g|kg|ml|l|pieces|packs)/i);
+
+                if (targetMatch) {
+                    const token = targetMatch[0].trim().replace(/\s+/g, ''); // e.g. "200g" or "1kg"
+                    const bestVar = variations.find(v => {
+                        const vName = (v.displayName || v.name || "").toLowerCase().replace(/\s+/g, '');
+                        return vName.includes(token);
+                    });
+                    if (bestVar) return bestVar.spinId || bestVar.spin_id || bestVar.id;
+                }
+            }
+
             return p.spinId || p.spin_id || p.variations?.[0]?.spinId || p.id;
         }
 

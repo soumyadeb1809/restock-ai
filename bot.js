@@ -572,20 +572,20 @@ bot.action('add_to_cart_now', async (ctx) => {
         for (const item of dueItems) {
             console.log(`[AddToCart] Searching for: ${item.itemName}...`);
             const searchResults = await swiggy.searchProducts(item.searchQuery, addressId);
-            let spinId = extractFirstSpinId(searchResults);
+            let spinId = extractFirstSpinId(searchResults, item.itemName);
 
             if (!spinId && item.fallbackSearchQuery) {
                 await delay(500); // Small interval padding for fallbacks
                 console.log(`[AddToCart] Trying fallback for ${item.itemName}: "${item.fallbackSearchQuery}"`);
                 const fallbackRes = await swiggy.searchProducts(item.fallbackSearchQuery, addressId);
-                spinId = extractFirstSpinId(fallbackRes);
+                spinId = extractFirstSpinId(fallbackRes, item.itemName);
             }
 
             if (!spinId && item.genericSearchQuery) {
                 await delay(500); // Small interval padding for alternatives queries
                 console.log(`[AddToCart] Trying generic alternative for ${item.itemName}: "${item.genericSearchQuery}"`);
                 const genericRes = await swiggy.searchProducts(item.genericSearchQuery, addressId);
-                const altSpinId = extractFirstSpinId(genericRes);
+                const altSpinId = extractFirstSpinId(genericRes, item.itemName);
                 if (altSpinId) {
                     spinId = altSpinId;
                     const altNames = extractAlternativeNames(genericRes);
