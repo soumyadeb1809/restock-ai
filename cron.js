@@ -123,12 +123,6 @@ export async function checkAndOrder(telegramUserId) {
                 
                 const displayName = orderQuantity > 1 ? `${item.itemName} (x${orderQuantity})` : item.itemName;
                 addedItemsList.push(displayName);
-
-                // 3. Update schedule manually
-                item.lastOrderedAt = today.toISOString();
-                const nextDate = new Date(today);
-                nextDate.setDate(nextDate.getDate() + item.frequencyDays);
-                item.nextSuggestedOrderAt = nextDate.toISOString();
             } else {
                 console.log(`[Cron] Could not find any match for ${item.itemName} (even with fallback).`);
                 
@@ -153,9 +147,6 @@ export async function checkAndOrder(telegramUserId) {
         // Notify the user
         if (addedItemsList.length > 0) {
             console.log(`[Cron] Batch Cart Update Complete. Added ${addedItemsList.length} items: ${addedItemsList.join(', ')}`);
-            // Save updated schedule back to DB
-            import('./db.js').then(db => db.saveConsumptionSchedule(telegramUserId, scheduleObj, { initiator: 'cron' }));
-
             // Alternative suggestions text (Markdown)
             let altsMarkdown = "";
             const altKeys = Object.keys(alternativeSuggestions);

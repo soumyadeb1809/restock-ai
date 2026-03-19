@@ -583,12 +583,6 @@ bot.action('add_to_cart_now', async (ctx) => {
                 if (!updateList.some(u => u.spinId === spinId)) {
                     updateList.push({ spinId: spinId, quantity: 1 });
                     successItems.push(item.itemName);
-
-                    // Update schedule locally
-                    item.lastOrderedAt = today.toISOString();
-                    const nextDate = new Date(today);
-                    nextDate.setDate(nextDate.getDate() + item.frequencyDays);
-                    item.nextSuggestedOrderAt = nextDate.toISOString();
                 }
             } else {
                 console.log(`[AddToCart] ❌ Could not find spinId for "${item.itemName}"`);
@@ -628,7 +622,6 @@ bot.action('add_to_cart_now', async (ctx) => {
         }
 
         if (addedCount > 0) {
-            await saveConsumptionSchedule(telegramUserId, profile, { initiator: 'user_action' });
             await ctx.telegram.editMessageText(ctx.chat.id, statusMessage.message_id, undefined, 
                 `✅ <b>Successfully added ${addedCount} items to your cart!</b>\n\nYou can now review and checkout in the Swiggy app.`, 
                 {
