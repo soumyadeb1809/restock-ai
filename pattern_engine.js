@@ -44,7 +44,7 @@ Your goal is to analyze these to determine recurring items (like milk, eggs, bre
 **CRITICAL BRAND & VARIANT INSTRUCTION:** 
 1. **Cross-Reference Lists**: The 'DETAILED ORDERS' list contains basic item names. The 'GO TO ITEMS' list contains richer metadata with detailed \`variations\` and \`quantityDescription\` (e.g., "300 ml x 6"). If an item appears in both lists, **strictly use the pack size/descriptions from the 'GO TO ITEMS' list** to model your suggested order variant.
 2. **Include Variant Specs**: Primary \`searchQuery\` must be extremely specific. Include weights/volumes (e.g., "300 ml x 6 packs", "500 g").
-3. **Determine Set Quantity**: Set the \`quantity\` field for the number of typical *packs* to trigger at once.
+3. **Determine Set Quantity**: Set the \`quantity\` field for the number of typical *packs* to trigger at once. **If you are uncertain about the correct pack size, ALWAYS default to the lowest available quantity or pack size to prevent over-ordering.**
 4. Provide a reputable \`fallbackSearchQuery\` of the **exact same variant/pack size** where possible.
 
 You must reply with ONLY a valid JSON object matching this schema:
