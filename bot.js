@@ -498,7 +498,9 @@ bot.action('add_to_cart_now', async (ctx) => {
     if (!(await swiggy.connect(token))) return ctx.reply("❌ Swiggy connection failed.");
 
     try {
-        await ctx.editMessageText("🔄 <b>Adding items to your cart...</b>", { parse_mode: 'HTML' });
+        // Remove buttons immediately to prevent duplicate clicks, while keeping the item list visible above!
+        await ctx.editMessageReplyMarkup({ inline_keyboard: [] });
+        const statusMessage = await ctx.reply("🔄 <b>Starting to add due items to your Swiggy cart...</b>", { parse_mode: 'HTML' });
 
         const today = new Date();
         const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
@@ -627,18 +629,29 @@ bot.action('add_to_cart_now', async (ctx) => {
 
         if (addedCount > 0) {
             await saveConsumptionSchedule(telegramUserId, profile, { initiator: 'user_action' });
-            await ctx.reply(`✅ <b>Successfully added ${addedCount} items to your cart!</b>\n\nYou can now review and checkout in the Swiggy app.`, {
-                parse_mode: 'HTML',
-                reply_markup: {
-                    inline_keyboard: [[{ text: "🛒 View Cart on Swiggy", url: "https://www.swiggy.com/instamart/cart" }]]
+            await ctx.telegram.editMessageText(ctx.chat.id, statusMessage.message_id, undefined, 
+                `✅ <b>Successfully added ${addedCount} items to your cart!</b>\n\nYou can now review and checkout in the Swiggy app.`, 
+                {
+                    parse_mode: 'HTML',
+                    reply_markup: {
+                        inline_keyboard: [[{ text: "🛒 View Cart on Swiggy", url: "https://www.swiggy.com/instamart/cart" }]]
+                    }
                 }
-            });
+            );
         } else {
-            await ctx.reply("⚠️ I couldn't find matches for the items due today. Please try searching for them manually in the Swiggy app.");
+            await ctx.telegram.editMessageText(ctx.chat.id, statusMessage.message_id, undefined, 
+                "⚠️ I couldn't find matches for the items due today. Please try searching for them manually in the Swiggy app."
+            );
         }
     } catch (e) {
         console.error("Add to Cart Error:", e);
-        ctx.reply("❌ Failed to complete cart update.");
+        try {
+            await ctx.telegram.editMessageText(ctx.chat.id, statusMessage.message_id, undefined, 
+                "❌ <b>Failed to complete cart update.</b> Please try again or check logs.", { parse_mode: 'HTML' }
+            );
+        } catch (editErr) {
+            await ctx.reply("❌ Failed to complete cart update.");
+        }
     } finally {
         await swiggy.disconnect();
     }
