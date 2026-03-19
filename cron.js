@@ -50,10 +50,16 @@ export async function checkAndOrder(telegramUserId) {
         return;
     }
 
+    const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+
     const itemsToOrder = scheduleObj.schedule.filter(item => {
-        const nextOrderDate = new Date(item.nextSuggestedOrderAt);
+        if (!item.itemName) return false;
+        
+        const nextOrder = new Date(item.nextSuggestedOrderAt);
+        const nextOrderStart = new Date(nextOrder.getFullYear(), nextOrder.getMonth(), nextOrder.getDate());
+        
         // Is the next order date today or in the past?
-        return nextOrderDate <= today;
+        return nextOrderStart <= todayStart;
     });
 
     if (itemsToOrder.length === 0) {
