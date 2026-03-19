@@ -48,12 +48,17 @@ app.get('/run-daily-check', async (req, res) => {
             throw new Error("TELEGRAM_ALLOWED_USER_ID is missing from .env");
         }
 
-        // Execute the daily check for the single user MVP
-        await checkAndOrder(TELEGRAM_ALLOWED_USER_ID);
-        res.send("Daily check executed successfully.");
+        // Execute the daily check asynchronously in the background
+        console.log("Triggering checkAndOrder in the background...");
+        checkAndOrder(TELEGRAM_ALLOWED_USER_ID).catch(e => {
+            console.error("Background Cron Task Error:", e);
+        });
+        
+        // Immediately acknowledge the request so the cron service doesn't timeout
+        res.status(202).send("Daily check started in background.");
     } catch (e) {
         console.error("Cron Endpoint Error:", e);
-        res.status(500).send("Error executing daily check.");
+        res.status(500).send("Error starting daily check.");
     }
 });
 
